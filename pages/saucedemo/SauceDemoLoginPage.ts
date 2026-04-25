@@ -39,8 +39,7 @@ export class SauceDemoLoginPage extends BasePage {
   async login(username: string, password: string): Promise<void> {
     await this.fillInput(this.SELECTORS.username, username);
     await this.fillInput(this.SELECTORS.password, password);
-    await this.page.locator(this.SELECTORS.loginButton).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndWait(this.SELECTORS.loginButton);
   }
 
   /** Returns error text if visible, empty string otherwise */

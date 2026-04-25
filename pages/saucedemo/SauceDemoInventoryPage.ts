@@ -88,22 +88,20 @@ export class SauceDemoInventoryPage extends BasePage {
   // ─── Sorting ─────────────────────────────────────────────────────────────
 
   async sortBy(option: SortOption): Promise<void> {
-    await this.page.locator(this.SELECTORS.sortDropdown).selectOption(option);
-    // Wait for DOM to reflect the new order
-    await this.page.waitForLoadState('domcontentloaded');
+    const dropdown = this.page.locator(this.SELECTORS.sortDropdown);
+    await expect(dropdown).toBeVisible();
+    await dropdown.selectOption(option);
+    await expect(dropdown).toHaveValue(option);
   }
 
   // ─── Navigation ──────────────────────────────────────────────────────────
 
   async goToCart(): Promise<void> {
-    await this.page.locator(this.SELECTORS.cartLink).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndNavigate(this.SELECTORS.cartLink, /cart\.html/);
   }
 
   async logout(): Promise<void> {
-    await this.page.locator(this.SELECTORS.burgerMenu).click();
-    await expect(this.page.locator(this.SELECTORS.logoutLink)).toBeVisible();
-    await this.page.locator(this.SELECTORS.logoutLink).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndExpectVisible(this.SELECTORS.burgerMenu, this.SELECTORS.logoutLink);
+    await this.clickAndNavigate(this.SELECTORS.logoutLink, /saucedemo\.com\/?$/);
   }
 }

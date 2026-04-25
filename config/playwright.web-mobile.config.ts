@@ -38,7 +38,12 @@ export default defineConfig({
     baseURL:           BASE_URL,
     trace:             'retain-on-failure',
     screenshot:        'only-on-failure',
-    video:             'retain-on-failure',
+    video: {
+      mode: 'retain-on-failure',
+      show: {
+        actions: { position: 'top-right' },
+      },
+    },
     actionTimeout:     0,
     navigationTimeout: 0,
   },

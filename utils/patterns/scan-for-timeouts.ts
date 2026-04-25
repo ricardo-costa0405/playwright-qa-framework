@@ -96,7 +96,7 @@ if (totalViolations.length === 0) {
   console.log('✅ No hardcoded timeouts found!\n');
   console.log('Approved timeout patterns used:');
   console.log('  • expect(element).toBeVisible({ timeout: 10000 })');
-  console.log('  • page.waitForLoadState("networkidle")');
+  console.log('  • expect(page).toHaveURL(/expected-path/)');
   console.log('  • page.waitForFunction(...)');
   console.log('  • AntiTimeoutGuard.waitStrategies.*()');
   process.exit(0);

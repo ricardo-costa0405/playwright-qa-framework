@@ -54,12 +54,15 @@ export default defineConfig({
     trace:            'retain-on-failure',
     screenshot:       'only-on-failure',
     actionTimeout:    0,   // rely on Playwright auto-waiting
-    navigationTimeout: 0,  // use waitForLoadState explicitly
+    navigationTimeout: 0,  // let assertions drive readiness checks
 
-    // ── Screencast (Playwright 1.59.0) ─────────────────────────────────────
-    // Videos are always recorded and saved per-browser in reports/screencast-debug/
-    // Deleted automatically on success if PRESERVE_SCREENCAST=false (see .env)
-    video: 'on',
+    // ── Screencast / annotated videos (Playwright 1.59) ───────────────────
+    video: {
+      mode: 'on',
+      show: {
+        actions: { position: 'top-right' },
+      },
+    },
   },
 
   timeout: TIMEOUT,

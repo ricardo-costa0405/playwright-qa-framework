@@ -69,12 +69,10 @@ export class SauceDemoCartPage extends BasePage {
   // ─── Navigation ──────────────────────────────────────────────────────────
 
   async continueShopping(): Promise<void> {
-    await this.page.locator(this.SELECTORS.continueShopping).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndNavigate(this.SELECTORS.continueShopping, /inventory\.html/);
   }
 
   async proceedToCheckout(): Promise<void> {
-    await this.page.locator(this.SELECTORS.checkoutButton).click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndNavigate(this.SELECTORS.checkoutButton, /checkout-step-one/);
   }
 }

@@ -68,7 +68,14 @@ No `.env` setup needed — this framework targets Swag Labs exclusively and all 
 | `npm run test:all` | Desktop + mobile |
 | `npm run test:smoke` | Smoke tests only (`@smoke` tag) |
 | `npm run test:web:headed` | Desktop tests in headed mode |
+| `npm run test:web:ui` | Interactive Playwright UI mode |
 | `npm run test:web:debug` | Desktop tests in debug mode |
+| `npm run test:web:debug:cli` | CLI debug mode for Playwright Agent CLI attach |
+| `npm run test:web:dashboard` | Expose running tests to Playwright Agent CLI dashboard |
+
+For a simple live view, use `npm run test:web:headed` or `npm run test:web:ui`.
+
+Playwright 1.59 dashboard and CLI attach need the separate Playwright Agent CLI available on the machine. Start tests with `npm run test:web:dashboard`, then open the Agent CLI dashboard with `playwright-cli show`. For CLI debugging, start `npm run test:web:debug:cli`, copy the printed session name, and attach with `playwright-cli attach <session-name>`.
 
 ---
 
@@ -112,10 +119,12 @@ Artifacts (JUnit XML, HTML report, traces) are uploaded per run with 30-day rete
 Used during development for:
 - `npx playwright codegen` — generates test code by recording browser interactions
 - `npx playwright test --debug` / `--ui` — step-through debugging with the Inspector
+- `PLAYWRIGHT_DASHBOARD=1 npx playwright test` — exposes test browsers to the Playwright 1.59 Agent CLI dashboard
+- `npx playwright test --debug=cli` — pauses tests for Agent CLI attach/debug
 - `npx playwright show-report` — reviewing traces and failure screenshots locally
 
 **Pros:** Zero setup, ships with Playwright, great for quick exploration and trace review.
-**Cons:** Codegen produces fragile selectors (CSS/XPath) that need manual cleanup to `data-test` attributes. The Inspector is headful only, so not usable in CI.
+**Cons:** Codegen produces fragile selectors (CSS/XPath) that need manual cleanup to `data-test` attributes. The 1.59 dashboard and attach workflow need the separate Playwright Agent CLI installed locally.
 
 ### Playwright MCP
 
