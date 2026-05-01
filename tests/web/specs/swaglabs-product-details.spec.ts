@@ -1,5 +1,28 @@
 import { test, expect } from '../../../fixtures/saucedemo-fixtures';
 
+const SELECTORS = {
+  inventoryItem: '[data-test="inventory-item"]',
+  inventoryItemName: '[data-test="inventory-item-name"]',
+  inventoryItemPrice: '[data-test="inventory-item-price"]',
+  inventoryItemDescription: '[data-test="inventory-item-desc"]',
+  inventoryList: '[data-test="inventory-list"]',
+  productImage: '.inventory_item_img img',
+  detailsImage: '.inventory_details_img',
+  detailsContainer: '.inventory_details_desc_container',
+  addToCart: '[data-test="add-to-cart"]',
+  remove: '[data-test="remove"]',
+  cartBadge: '[data-test="shopping-cart-badge"]',
+  backToProducts: '[data-test="back-to-products"]',
+} as const;
+
+async function openProductDetails(page: import('@playwright/test').Page, index = 0): Promise<void> {
+  const productName = page.locator(SELECTORS.inventoryItemName).nth(index);
+  await expect(productName).toBeVisible();
+  await productName.click();
+  await expect(page).toHaveURL(/inventory-item/);
+  await expect(page.locator(SELECTORS.inventoryItem)).toBeVisible();
+}
+
 /**
  * Swag Labs — Product Details Feature Tests @product-details
  *
@@ -28,7 +51,7 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    const productImage = page.locator('.inventory_item_img img').first();
+    const productImage = page.locator(SELECTORS.productImage).first();
     await expect(productImage).toBeVisible();
 
     // ==================== ACT ====================
@@ -36,8 +59,8 @@ test.describe('Product Details Feature @product-details', () => {
 
     // ==================== ASSERT ====================
     await expect(page).toHaveURL(/inventory-item/);
-    await expect(page.locator('[data-test="inventory-item"]')).toBeVisible();
-    await expect(page.locator('.inventory_details_desc_container')).toBeVisible();
+    await expect(page.locator(SELECTORS.inventoryItem)).toBeVisible();
+    await expect(page.locator(SELECTORS.detailsContainer)).toBeVisible();
   });
 
   test('clicking product name navigates to product details', async ({
@@ -45,7 +68,7 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    const productName = page.locator('[data-test="inventory-item-name"]').first();
+    const productName = page.locator(SELECTORS.inventoryItemName).first();
     await expect(productName).toBeVisible();
 
     // ==================== ACT ====================
@@ -53,7 +76,7 @@ test.describe('Product Details Feature @product-details', () => {
 
     // ==================== ASSERT ====================
     await expect(page).toHaveURL(/inventory-item/);
-    await expect(page.locator('[data-test="inventory-item"]')).toBeVisible();
+    await expect(page.locator(SELECTORS.inventoryItem)).toBeVisible();
   });
 
   test('product detail page displays product name and price', async ({
@@ -62,19 +85,17 @@ test.describe('Product Details Feature @product-details', () => {
   }) => {
     // ==================== ARRANGE ====================
     const productName = await page
-      .locator('[data-test="inventory-item-name"]')
+      .locator(SELECTORS.inventoryItemName)
       .first()
-      .textContent();
+      .innerText();
 
     // ==================== ACT ====================
-    await page.locator('[data-test="inventory-item-name"]').first().click();
+    await openProductDetails(page);
 
     // ==================== ASSERT ====================
-    const detailName = await page.locator('[data-test="inventory-item-name"]').textContent();
-    expect(detailName).toBe(productName);
+    await expect(page.locator(SELECTORS.inventoryItemName)).toHaveText(productName);
 
-    const detailPrice = await page.locator('[data-test="inventory-item-price"]').textContent();
-    expect(detailPrice).toMatch(/\$[\d.]+/);
+    await expect(page.locator(SELECTORS.inventoryItemPrice)).toContainText(/\$[\d.]+/);
   });
 
   test('product detail image loads successfully', async ({
@@ -82,12 +103,11 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    await page.locator('[data-test="inventory-item-name"]').first().click();
-    await expect(page).toHaveURL(/inventory-item/);
+    await openProductDetails(page);
 
     // ==================== ACT ====================
     // .inventory_details_img IS the <img> element — do not chain >> img into it
-    const detailImage = page.locator('.inventory_details_img');
+    const detailImage = page.locator(SELECTORS.detailsImage);
 
     // ==================== ASSERT ====================
     await expect(detailImage).toBeVisible();
@@ -103,16 +123,14 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    await page.locator('[data-test="inventory-item-name"]').first().click();
-    await expect(page).toHaveURL(/inventory-item/);
+    await openProductDetails(page);
 
     // ==================== ACT ====================
-    const description = await page.locator('[data-test="inventory-item-desc"]').textContent();
+    const description = page.locator(SELECTORS.inventoryItemDescription);
 
     // ==================== ASSERT ====================
-    expect(description).toBeTruthy();
-    expect(description!.length).toBeGreaterThan(10);
-    await expect(page.locator('[data-test="inventory-item-desc"]')).toBeVisible();
+    await expect(description).toBeVisible();
+    await expect(description).toContainText(/\w{10,}/);
   });
 
   // ─── Add to cart from product details ─────────────────────────────────────
@@ -122,16 +140,15 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    await page.locator('[data-test="inventory-item-name"]').first().click();
-    await expect(page).toHaveURL(/inventory-item/);
+    await openProductDetails(page);
 
     // ==================== ACT ====================
-    await page.click('[data-test="add-to-cart"]');
+    await page.locator(SELECTORS.addToCart).click();
 
     // ==================== ASSERT ====================
     // Button should change to "Remove"
-    await expect(page.locator('[data-test="remove"]')).toBeVisible();
-    await expect(page.locator('[data-test="shopping-cart-badge"]')).toHaveText('1');
+    await expect(page.locator(SELECTORS.remove)).toBeVisible();
+    await expect(page.locator(SELECTORS.cartBadge)).toHaveText('1');
   });
 
   test('remove from cart button on detail page removes item correctly', async ({
@@ -139,18 +156,17 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    await page.locator('[data-test="inventory-item-name"]').first().click();
-    await expect(page).toHaveURL(/inventory-item/);
+    await openProductDetails(page);
 
-    await page.click('[data-test="add-to-cart"]');
-    await expect(page.locator('[data-test="remove"]')).toBeVisible();
+    await page.locator(SELECTORS.addToCart).click();
+    await expect(page.locator(SELECTORS.remove)).toBeVisible();
 
     // ==================== ACT ====================
-    await page.click('[data-test="remove"]');
+    await page.locator(SELECTORS.remove).click();
 
     // ==================== ASSERT ====================
-    await expect(page.locator('[data-test="add-to-cart"]')).toBeVisible();
-    await expect(page.locator('[data-test="shopping-cart-badge"]')).toBeHidden();
+    await expect(page.locator(SELECTORS.addToCart)).toBeVisible();
+    await expect(page.locator(SELECTORS.cartBadge)).toBeHidden();
   });
 
   // ─── Navigation from product details ──────────────────────────────────────
@@ -160,15 +176,14 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    await page.locator('[data-test="inventory-item-name"]').first().click();
-    await expect(page).toHaveURL(/inventory-item/);
+    await openProductDetails(page);
 
     // ==================== ACT ====================
-    await page.click('[data-test="back-to-products"]');
+    await page.locator(SELECTORS.backToProducts).click();
 
     // ==================== ASSERT ====================
     await expect(page).toHaveURL(/inventory\.html/);
-    await expect(page.locator('[data-test="inventory-list"]')).toBeVisible();
+    await expect(page.locator(SELECTORS.inventoryList)).toBeVisible();
   });
 
   // ─── Multiple product details navigation ───────────────────────────────────
@@ -178,25 +193,21 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    const firstProductName = await page.locator('[data-test="inventory-item-name"]').nth(0).textContent();
+    const firstProductName = await page.locator(SELECTORS.inventoryItemName).nth(0).innerText();
 
     // ==================== ACT ====================
-    await page.locator('[data-test="inventory-item-name"]').nth(0).click();
-    await expect(page).toHaveURL(/inventory-item/);
+    await openProductDetails(page, 0);
 
-    await page.click('[data-test="back-to-products"]');
+    await page.locator(SELECTORS.backToProducts).click();
     await expect(page).toHaveURL(/inventory\.html/);
 
-    const secondProductName = await page.locator('[data-test="inventory-item-name"]').nth(1).textContent();
+    const secondProductName = await page.locator(SELECTORS.inventoryItemName).nth(1).innerText();
 
-    await page.locator('[data-test="inventory-item-name"]').nth(1).click();
-    await expect(page).toHaveURL(/inventory-item/);
-
-    const detailName = await page.locator('[data-test="inventory-item-name"]').textContent();
+    await openProductDetails(page, 1);
 
     // ==================== ASSERT ====================
-    expect(detailName).toBe(secondProductName);
-    expect(detailName).not.toBe(firstProductName);
+    await expect(page.locator(SELECTORS.inventoryItemName)).toHaveText(secondProductName);
+    await expect(page.locator(SELECTORS.inventoryItemName)).not.toHaveText(firstProductName);
   });
 
   test('cart state persists when navigating between product details', async ({
@@ -204,19 +215,19 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    await page.locator('[data-test="inventory-item-name"]').nth(0).click();
-    await page.click('[data-test="add-to-cart"]');
-    await expect(page.locator('[data-test="shopping-cart-badge"]')).toHaveText('1');
+    await openProductDetails(page, 0);
+    await page.locator(SELECTORS.addToCart).click();
+    await expect(page.locator(SELECTORS.cartBadge)).toHaveText('1');
 
     // ==================== ACT ====================
-    await page.click('[data-test="back-to-products"]');
-    await page.locator('[data-test="inventory-item-name"]').nth(1).click();
+    await page.locator(SELECTORS.backToProducts).click();
+    await openProductDetails(page, 1);
 
     // ==================== ASSERT ====================
-    await expect(page.locator('[data-test="shopping-cart-badge"]')).toHaveText('1');
+    await expect(page.locator(SELECTORS.cartBadge)).toHaveText('1');
 
-    await page.click('[data-test="add-to-cart"]');
-    await expect(page.locator('[data-test="shopping-cart-badge"]')).toHaveText('2');
+    await page.locator(SELECTORS.addToCart).click();
+    await expect(page.locator(SELECTORS.cartBadge)).toHaveText('2');
   });
 
   test('product detail page shows correct add/remove button state based on cart', async ({
@@ -224,20 +235,20 @@ test.describe('Product Details Feature @product-details', () => {
     page,
   }) => {
     // ==================== ARRANGE ====================
-    await page.locator('[data-test="inventory-item-name"]').first().click();
+    await openProductDetails(page);
 
     // ==================== ACT ====================
-    let button = page.locator('[data-test="add-to-cart"]');
+    let button = page.locator(SELECTORS.addToCart);
 
     // ==================== ASSERT ====================
     await expect(button).toBeVisible();
 
     await button.click();
-    button = page.locator('[data-test="remove"]');
+    button = page.locator(SELECTORS.remove);
     await expect(button).toBeVisible();
 
     await button.click();
-    button = page.locator('[data-test="add-to-cart"]');
+    button = page.locator(SELECTORS.addToCart);
     await expect(button).toBeVisible();
   });
 
