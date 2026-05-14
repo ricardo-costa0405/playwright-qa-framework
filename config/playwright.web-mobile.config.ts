@@ -28,6 +28,7 @@ export default defineConfig({
   workers:      CI ? 4 : undefined,
 
   reporter: [
+    ...(CI ? [['github'] as ['github']] : []),
     ['junit', { outputFile: '../reports/junit/web-mobile-results.xml' }],
     ['html',  { outputFolder: '../reports/html/web-mobile', open: 'never' }],
     ['json',  { outputFile: '../reports/failures.json' }],
@@ -36,7 +37,7 @@ export default defineConfig({
 
   use: {
     baseURL:           BASE_URL,
-    trace:             'retain-on-failure',
+    trace:             CI ? 'retain-on-failure-and-retries' : 'retain-on-failure',
     screenshot:        'only-on-failure',
     video:             'retain-on-failure',
     actionTimeout:     0,

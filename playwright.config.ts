@@ -36,6 +36,7 @@ export default defineConfig({
   retries: CI ? 2 : 0,
   workers: CI ? 4 : undefined,
   reporter: [
+    ...(CI ? [['github'] as ['github']] : []),
     ['junit', { outputFile: 'reports/junit/web-results.xml' }],
     ['html', { outputFolder: 'reports/html/web', open: 'never' }],
     ['list'],
@@ -43,7 +44,7 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
-    trace: 'retain-on-failure',
+    trace: CI ? 'retain-on-failure-and-retries' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     actionTimeout: 0,
     navigationTimeout: 0,
