@@ -43,6 +43,7 @@ export default defineConfig({
   workers:       CI ? 4 : undefined,
 
   reporter: [
+    ...(CI ? [['github'] as ['github']] : []),
     ['junit', { outputFile: '../reports/junit/web-results.xml' }],
     ['html',  { outputFolder: '../reports/html/web', open: 'never' }],
     ['json',  { outputFile: '../reports/failures.json' }],
@@ -51,12 +52,12 @@ export default defineConfig({
 
   use: {
     baseURL:          BASE_URL,
-    trace:            'retain-on-failure',
+    trace:            CI ? 'retain-on-failure-and-retries' : 'retain-on-failure',
     screenshot:       'only-on-failure',
     actionTimeout:    0,   // rely on Playwright auto-waiting
     navigationTimeout: 0,  // use waitForLoadState explicitly
 
-    // ── Screencast (Playwright 1.59.0) ─────────────────────────────────────
+    // ── Video artifacts (Playwright 1.60.0) ────────────────────────────────
     // Videos are always recorded and saved per-browser in reports/screencast-debug/
     // Deleted automatically on success if PRESERVE_SCREENCAST=false (see .env)
     video: 'on',
