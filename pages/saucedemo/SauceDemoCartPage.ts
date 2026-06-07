@@ -2,71 +2,67 @@ import { expect } from '@playwright/test';
 import { BasePage } from '../BasePage';
 
 /**
- * Sauce Demo Cart Page — Page Object Model
+ * Sauce Demo Cart Page
  *
- * URL: /cart.html
- *
- * Covers:
- *  - Inspect cart contents (names, prices, quantities)
- *  - Remove individual items
- *  - Continue shopping (back to inventory)
- *  - Proceed to checkout
+ * Locator strategy (priority order):
+ *  1. getByRole — Checkout and Continue Shopping buttons
+ *     Note: "Continue Shopping" button accessible name is "Go back Continue Shopping"
+ *     (composite from img alt + text). Playwright substring-matches by default.
+ *  2. data-test fallback — only where no accessible anchor exists:
+ *     · cartItem     — container div, no semantic role
+ *     · itemName/Price/Qty — used for bulk text extraction only
  */
 export class SauceDemoCartPage extends BasePage {
-  private readonly SELECTORS = {
-    title:             '[data-test="title"]',
-    cartList:          '[data-test="cart-list"]',
-    cartItem:          '[data-test="inventory-item"]',
-    itemName:          '[data-test="inventory-item-name"]',
-    itemPrice:         '[data-test="inventory-item-price"]',
-    itemQuantity:      '[data-test="item-quantity"]',
-    continueShopping:  '[data-test="continue-shopping"]',
-    checkoutButton:    '[data-test="checkout"]',
-  } as const;
+  // ─── Locators ─────────────────────────────────────────────────────────────
+
+  // Composite accessible name "Go back Continue Shopping" — substring match ✓
+  readonly continueShoppingButton = this.page.getByRole('button', { name: 'Continue Shopping' });
+  readonly checkoutButton         = this.page.getByRole('button', { name: 'Checkout' });
+
+  // Container divs — no semantic role; used as filter scope only
+  private readonly cartItem     = this.page.locator('[data-test="inventory-item"]');
+  private readonly itemNameText = this.page.locator('[data-test="inventory-item-name"]');
+  private readonly itemPrice    = this.page.locator('[data-test="inventory-item-price"]');
 
   protected getUrl(): string {
     return '/cart.html';
   }
 
   protected async verifyPageLoaded(): Promise<void> {
-    await expect(this.page.locator(this.SELECTORS.title)).toHaveText('Your Cart');
+    await expect(this.page.locator('[data-test="title"]')).toHaveText('Your Cart');
   }
 
-  // ─── Cart queries ────────────────────────────────────────────────────────
+  // ─── Cart queries ─────────────────────────────────────────────────────────
 
   async getCartItemCount(): Promise<number> {
-    return this.page.locator(this.SELECTORS.cartItem).count();
+    return this.cartItem.count();
   }
 
   async getCartItemNames(): Promise<string[]> {
-    return this.page.locator(this.SELECTORS.itemName).allTextContents();
+    return this.itemNameText.allTextContents();
   }
 
   async getCartItemPrices(): Promise<number[]> {
-    const texts = await this.page.locator(this.SELECTORS.itemPrice).allTextContents();
-    return texts.map(t => parseFloat(t.replace('$', '')));
+    const texts = await this.itemPrice.allTextContents();
+    return texts.map((t) => parseFloat(t.replace('$', '')));
   }
 
   async getItemQuantity(itemName: string): Promise<number> {
-    const item = this.page.locator(this.SELECTORS.cartItem).filter({ hasText: itemName });
-    const qty = await item.locator(this.SELECTORS.itemQuantity).textContent();
+    const item = this.cartItem.filter({ hasText: itemName });
+    const qty = await item.locator('[data-test="item-quantity"]').textContent();
     return parseInt(qty ?? '0', 10);
   }
 
-  // ─── Cart actions ────────────────────────────────────────────────────────
+  // ─── Cart actions ─────────────────────────────────────────────────────────
 
-  /** Remove a specific item by its name */
   async removeItem(itemName: string): Promise<void> {
-    const item = this.page.locator(this.SELECTORS.cartItem).filter({ hasText: itemName });
+    const item = this.cartItem.filter({ hasText: itemName });
     await expect(item).toBeVisible();
-    await item.getByRole('button', { name: /remove/i }).click();
-    // Verify the item is gone before returning
-    await expect(
-      this.page.locator(this.SELECTORS.cartItem).filter({ hasText: itemName })
-    ).toHaveCount(0);
+    await item.getByRole('button', { name: 'Remove' }).click();
+    await expect(this.cartItem.filter({ hasText: itemName })).toHaveCount(0);
   }
 
-  // ─── Navigation ──────────────────────────────────────────────────────────
+  // ─── Navigation ───────────────────────────────────────────────────────────
 
   async continueShopping(): Promise<void> {
     await this.clickAndNavigate(this.SELECTORS.continueShopping, /inventory\.html/);

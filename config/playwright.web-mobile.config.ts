@@ -29,6 +29,7 @@ export default defineConfig({
   workers:      CI ? 4 : undefined,
 
   reporter: [
+    ...(CI ? [['github'] as ['github']] : []),
     ['junit', { outputFile: '../reports/junit/web-mobile-results.xml' }],
     ['html',  { outputFolder: '../reports/html/web-mobile', open: 'never' }],
     ['json',  { outputFile: '../reports/failures.json' }],

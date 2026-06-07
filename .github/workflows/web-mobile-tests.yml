@@ -3,13 +3,11 @@ name: 'Web Mobile Tests - Playwright'
 on:
   push:
     branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
   schedule:
     - cron: '0 3 * * *' # Daily at 3 AM UTC
 
 concurrency:
-  group: playwright-web-mobile-${{ github.event.pull_request.number || github.ref }}
+  group: playwright-web-mobile-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -18,28 +16,44 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       checks: write
-      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
-        device: ['Mobile Chrome', 'Mobile Safari', 'Galaxy S24']
-        node-version: [24.x]
+        include:
+          - device: 'Mobile Chrome'
+            browser: chromium
+          - device: 'Mobile Safari'
+            browser: webkit
+          - device: 'Galaxy S24'
+            browser: chromium
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24.x
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ matrix.browser }}-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Install Playwright browsers
-        run: npm run install:browsers
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps ${{ matrix.browser }}
+          else
+            npx playwright install --with-deps ${{ matrix.browser }}
+          fi
 
       - name: Run web mobile tests - ${{ matrix.device }}
         run: npm run test:web-mobile -- --project="${{ matrix.device }}"
@@ -70,10 +84,38 @@ jobs:
           path: test-results/
           retention-days: 7
 
-      - name: Publish test results
-        uses: EnricoMi/publish-unit-test-result-action@v2
+      - name: Write job summary
+        uses: actions/github-script@v7
         if: always()
         with:
-          files: reports/junit/web-mobile-results.xml
-          check_name: 'Web Mobile Tests Results - ${{ matrix.device }}'
-          comment_title: 'Web Mobile Tests - ${{ matrix.device }}'
+          script: |
+            const fs = require('fs');
+            const xmlPath = 'reports/junit/web-mobile-results.xml';
+            if (!fs.existsSync(xmlPath)) {
+              await core.summary.addRaw('No JUnit report found.').write();
+              return;
+            }
+            const xml = fs.readFileSync(xmlPath, 'utf8');
+            const root = xml.match(/<testsuites[^>]*>/)?.[0] ?? '';
+            const attr = (name) => {
+              const m = root.match(new RegExp(`${name}="([^"]+)"`));
+              return m ? m[1] : '0';
+            };
+            const total    = parseInt(attr('tests'),    10) || 0;
+            const failures = parseInt(attr('failures'), 10) || 0;
+            const errors   = parseInt(attr('errors'),   10) || 0;
+            const skipped  = parseInt(attr('skipped'),  10) || 0;
+            const duration = parseFloat(attr('time'))       || 0;
+            const passed   = total - failures - errors - skipped;
+            const badge    = failures + errors === 0 ? '✅ PASS' : '❌ FAIL';
+
+            await core.summary
+              .addHeading(`Mobile Tests – ${{ matrix.device }}  ${badge}`)
+              .addTable([
+                [{data: 'Metric', header: true}, {data: 'Value', header: true}],
+                ['Passed',   `${passed} / ${total}`],
+                ['Failed',   `${failures + errors}`],
+                ['Skipped',  `${skipped}`],
+                ['Duration', `${duration.toFixed(2)}s`],
+              ])
+              .write();

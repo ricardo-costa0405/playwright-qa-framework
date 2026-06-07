@@ -1,8 +1,8 @@
 # Playwright Framework
 
-[![Web Tests](https://github.com/ricardo-costa0405/playwright-quality-engineering/actions/workflows/web-tests.yml/badge.svg)](https://github.com/ricardo-costa0405/playwright-quality-engineering/actions/workflows/web-tests.yml)
-[![Web Mobile Tests](https://github.com/ricardo-costa0405/playwright-quality-engineering/actions/workflows/web-mobile-tests.yml/badge.svg)](https://github.com/ricardo-costa0405/playwright-quality-engineering/actions/workflows/web-mobile-tests.yml)
-[![Smoke Tests](https://github.com/ricardo-costa0405/playwright-quality-engineering/actions/workflows/smoke-tests.yml/badge.svg)](https://github.com/ricardo-costa0405/playwright-quality-engineering/actions/workflows/smoke-tests.yml)
+[![Web Tests](https://github.com/ricardo-costa0405/playwright-qa-framework/actions/workflows/web-tests.yml/badge.svg)](https://github.com/ricardo-costa0405/playwright-qa-framework/actions/workflows/web-tests.yml)
+[![Web Mobile Tests](https://github.com/ricardo-costa0405/playwright-qa-framework/actions/workflows/web-mobile-tests.yml/badge.svg)](https://github.com/ricardo-costa0405/playwright-qa-framework/actions/workflows/web-mobile-tests.yml)
+[![Smoke Tests](https://github.com/ricardo-costa0405/playwright-qa-framework/actions/workflows/smoke-tests.yml/badge.svg)](https://github.com/ricardo-costa0405/playwright-qa-framework/actions/workflows/smoke-tests.yml)
 
 End-to-end test suite for [Swag Labs](https://www.saucedemo.com) built with Playwright and TypeScript.
 
@@ -94,7 +94,7 @@ Three GitHub Actions workflows run on push and pull requests to `main`:
 - `web-mobile-tests.yml` — mobile device emulation (Pixel 5, iPhone 13, Galaxy S24)
 - `smoke-tests.yml` — fast smoke pass, posts results as a PR comment
 
-Artifacts (JUnit XML, HTML report, traces) are uploaded per run with 30-day retention. Screencast recordings are kept for 7 days on failure only.
+Artifacts (JUnit XML, HTML report, traces, and failure videos) are uploaded per run. On CI retries, Playwright keeps traces for the failed attempt and its retry so flakes are easier to compare.
 
 ---
 

@@ -2,64 +2,53 @@ import { expect } from '@playwright/test';
 import { BasePage } from '../BasePage';
 
 /**
- * Sauce Demo Login Page — Page Object Model
+ * Sauce Demo Login Page
  *
- * Target: https://www.saucedemo.com
- *
- * Covers:
- *  - Standard login / logout
- *  - Locked-out user error
- *  - Empty form validation
- *
- * Anti-patterns enforced (see utils/patterns/anti-patterns-guide.ts):
- *  ✗ No waitForTimeout / sleep
- *  ✗ No XPath selectors
- *  ✗ No brittle nth-child selectors
- *  ✓ data-test attributes + semantic IDs only
- *  ✓ State-based waits via expect()
+ * Locator strategy (priority order):
+ *  1. getByRole       — reflects user + screen reader interaction
+ *  2. getByPlaceholder — inputs have no <label>, only placeholders
+ *  3. data-test fallback — only where no accessible anchor exists:
+ *     · errorBanner   — container div has no role or accessible name
+ *     · dismissButton — icon-only ✕ button with no accessible name
  */
 export class SauceDemoLoginPage extends BasePage {
-  private readonly SELECTORS = {
-    username:     '[data-test="username"]',
-    password:     '[data-test="password"]',
-    loginButton:  '[data-test="login-button"]',
-    errorMessage: '[data-test="error"]',
-    errorButton:  '[data-test="error-button"]',
-  } as const;
+  // ─── Locators ─────────────────────────────────────────────────────────────
+  readonly usernameInput = this.page.getByPlaceholder('Username');
+  readonly passwordInput = this.page.getByPlaceholder('Password');
+  readonly loginButton   = this.page.getByRole('button', { name: 'Login' });
+
+  // Container div has no role/accessible name → data-test fallback
+  readonly errorBanner   = this.page.locator('[data-test="error"]');
+  // Icon-only ✕ button has no accessible name → data-test fallback
+  readonly dismissButton = this.page.locator('[data-test="error-button"]');
 
   protected getUrl(): string {
     return '/';
   }
 
   protected async verifyPageLoaded(): Promise<void> {
-    await expect(this.page.locator(this.SELECTORS.loginButton)).toBeVisible();
+    await expect(this.loginButton).toBeVisible();
   }
 
-  /** Fill credentials and submit */
+  // ─── Actions ──────────────────────────────────────────────────────────────
+
   async login(username: string, password: string): Promise<void> {
     await this.fillInput(this.SELECTORS.username, username);
     await this.fillInput(this.SELECTORS.password, password);
     await this.clickAndWait(this.SELECTORS.loginButton);
   }
 
-  /** Returns error text if visible, empty string otherwise */
   async getErrorMessage(): Promise<string> {
-    const error = this.page.locator(this.SELECTORS.errorMessage);
-    try {
-      await expect(error).toBeVisible();
-      return (await error.textContent())?.trim() ?? '';
-    } catch {
-      return '';
-    }
+    if (!await this.errorBanner.isVisible()) return '';
+    return (await this.errorBanner.textContent())?.trim() ?? '';
   }
 
   async hasError(): Promise<boolean> {
-    return this.isElementVisible(this.SELECTORS.errorMessage);
+    return this.errorBanner.isVisible();
   }
 
-  /** Dismiss the visible error banner */
   async dismissError(): Promise<void> {
-    await this.page.locator(this.SELECTORS.errorButton).click();
-    await expect(this.page.locator(this.SELECTORS.errorMessage)).toBeHidden();
+    await this.dismissButton.click();
+    await expect(this.errorBanner).toBeHidden();
   }
 }

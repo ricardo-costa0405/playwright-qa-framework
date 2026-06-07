@@ -2,60 +2,65 @@ import { expect } from '@playwright/test';
 import { BasePage } from '../BasePage';
 
 export interface CheckoutInfo {
-  firstName: string;
-  lastName:  string;
+  firstName:  string;
+  lastName:   string;
   postalCode: string;
 }
 
 /**
- * Sauce Demo Checkout Page — Page Object Model
- *
- * Covers 3 sequential steps:
+ * Sauce Demo Checkout Page — covers all 3 steps + complete screen
  *
  *   Step 1 (/checkout-step-one.html)  — Customer info form
  *   Step 2 (/checkout-step-two.html)  — Order overview + totals
  *   Complete (/checkout-complete.html) — Confirmation
  *
- * Each step is handled by dedicated methods; the POM follows the user
- * through the entire flow without the test knowing about URLs.
+ * Locator strategy (priority order):
+ *  1. getByRole    — all buttons
+ *  2. getByPlaceholder — form inputs (no <label> elements, only placeholders)
+ *     Note: "Cancel" button accessible name is "Go back Cancel" (composite
+ *     from img alt + text). Playwright substring-matches by default.
+ *  3. data-test fallback — only where no accessible anchor exists:
+ *     · errorBanner  — container div, no role/accessible name
+ *     · summary labels (itemTotal, tax, total) — plain text nodes, no role
  */
 export class SauceDemoCheckoutPage extends BasePage {
-  private readonly SELECTORS = {
-    // Step 1
-    title:          '[data-test="title"]',
-    firstName:      '[data-test="firstName"]',
-    lastName:       '[data-test="lastName"]',
-    postalCode:     '[data-test="postalCode"]',
-    continueButton: '[data-test="continue"]',
-    cancelButton:   '[data-test="cancel"]',
-    errorMessage:   '[data-test="error"]',
+  // ─── Step 1 locators ──────────────────────────────────────────────────────
+  readonly firstNameInput = this.page.getByPlaceholder('First Name');
+  readonly lastNameInput  = this.page.getByPlaceholder('Last Name');
+  readonly postalCodeInput = this.page.getByPlaceholder('Zip/Postal Code');
+  readonly continueButton = this.page.getByRole('button', { name: 'Continue' });
+  // Composite accessible name "Go back Cancel" — substring match ✓
+  readonly cancelButton   = this.page.getByRole('button', { name: 'Cancel' });
 
-    // Step 2
-    itemTotal:      '[data-test="subtotal-label"]',
-    taxLabel:       '[data-test="tax-label"]',
-    totalLabel:     '[data-test="total-label"]',
-    finishButton:   '[data-test="finish"]',
+  // Error container has no role/accessible name → data-test fallback
+  readonly errorBanner    = this.page.locator('[data-test="error"]');
 
-    // Complete
-    completeHeader: '[data-test="complete-header"]',
-    completeText:   '[data-test="complete-text"]',
-    backHomeButton: '[data-test="back-to-products"]',
-  } as const;
+  // ─── Step 2 locators ──────────────────────────────────────────────────────
+  readonly finishButton   = this.page.getByRole('button', { name: 'Finish' });
+
+  // Plain text nodes with no role → data-test fallback
+  readonly itemTotalLabel = this.page.locator('[data-test="subtotal-label"]');
+  readonly taxLabel       = this.page.locator('[data-test="tax-label"]');
+  readonly totalLabel     = this.page.locator('[data-test="total-label"]');
+
+  // ─── Complete screen locators ─────────────────────────────────────────────
+  readonly completeHeading = this.page.getByRole('heading', { name: 'Thank you for your order!' });
+  readonly backHomeButton  = this.page.getByRole('button', { name: 'Back Home' });
 
   protected getUrl(): string {
     return '/checkout-step-one.html';
   }
 
   protected async verifyPageLoaded(): Promise<void> {
-    await expect(this.page.locator(this.SELECTORS.firstName)).toBeVisible();
+    await expect(this.firstNameInput).toBeVisible();
   }
 
-  // ─── Step 1: Customer Info ────────────────────────────────────────────────
+  // ─── Step 1: Customer info ─────────────────────────────────────────────────
 
   async fillInfo(info: CheckoutInfo): Promise<void> {
-    await this.fillInput(this.SELECTORS.firstName, info.firstName);
-    await this.fillInput(this.SELECTORS.lastName, info.lastName);
-    await this.fillInput(this.SELECTORS.postalCode, info.postalCode);
+    await this.firstNameInput.fill(info.firstName);
+    await this.lastNameInput.fill(info.lastName);
+    await this.postalCodeInput.fill(info.postalCode);
   }
 
   async continueToOverview(): Promise<void> {
@@ -67,43 +72,40 @@ export class SauceDemoCheckoutPage extends BasePage {
   }
 
   async hasError(): Promise<boolean> {
-    return this.isElementVisible(this.SELECTORS.errorMessage);
+    return this.errorBanner.isVisible();
   }
 
   async getErrorMessage(): Promise<string> {
-    return this.getText(this.SELECTORS.errorMessage);
+    if (!await this.errorBanner.isVisible()) return '';
+    return (await this.errorBanner.textContent())?.trim() ?? '';
   }
 
-  // ─── Step 2: Overview ────────────────────────────────────────────────────
+  // ─── Step 2: Overview ─────────────────────────────────────────────────────
 
   async getItemTotal(): Promise<string> {
-    return this.getText(this.SELECTORS.itemTotal);
+    return (await this.itemTotalLabel.textContent())?.trim() ?? '';
   }
 
   async getTax(): Promise<string> {
-    return this.getText(this.SELECTORS.taxLabel);
+    return (await this.taxLabel.textContent())?.trim() ?? '';
   }
 
   async getTotal(): Promise<string> {
-    return this.getText(this.SELECTORS.totalLabel);
+    return (await this.totalLabel.textContent())?.trim() ?? '';
   }
 
   async finishOrder(): Promise<void> {
     await this.clickAndNavigate(this.SELECTORS.finishButton, /checkout-complete/);
   }
 
-  // ─── Complete ────────────────────────────────────────────────────────────
+  // ─── Complete screen ──────────────────────────────────────────────────────
 
   async isOrderComplete(): Promise<boolean> {
-    return this.isElementVisible(this.SELECTORS.completeHeader);
+    return this.completeHeading.isVisible();
   }
 
   async getCompleteHeader(): Promise<string> {
-    return this.getText(this.SELECTORS.completeHeader);
-  }
-
-  async getCompleteText(): Promise<string> {
-    return this.getText(this.SELECTORS.completeText);
+    return (await this.completeHeading.textContent())?.trim() ?? '';
   }
 
   async backToProducts(): Promise<void> {
