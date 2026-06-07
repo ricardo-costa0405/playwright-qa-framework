@@ -84,20 +84,24 @@ export class SauceDemoInventoryPage extends BasePage {
   // ─── Sorting ──────────────────────────────────────────────────────────────
 
   async sortBy(option: SortOption): Promise<void> {
-    const dropdown = this.page.locator(this.SELECTORS.sortDropdown);
-    await expect(dropdown).toBeVisible();
-    await dropdown.selectOption(option);
-    await expect(dropdown).toHaveValue(option);
+    await expect(this.sortDropdown).toBeVisible();
+    await this.sortDropdown.selectOption(option);
+    await expect(this.sortDropdown).toHaveValue(option);
   }
 
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   async goToCart(): Promise<void> {
-    await this.clickAndNavigate(this.SELECTORS.cartLink, /cart\.html/);
+    await expect(this.cartLink).toBeVisible();
+    await this.cartLink.click();
+    await expect(this.page).toHaveURL(/cart\.html/);
   }
 
   async logout(): Promise<void> {
-    await this.clickAndExpectVisible(this.SELECTORS.burgerMenu, this.SELECTORS.logoutLink);
-    await this.clickAndNavigate(this.SELECTORS.logoutLink, /saucedemo\.com\/?$/);
+    await expect(this.burgerMenuButton).toBeVisible();
+    await this.burgerMenuButton.click();
+    await expect(this.logoutLink).toBeVisible();
+    await this.logoutLink.click();
+    await expect(this.page).toHaveURL(/saucedemo\.com\/?$/);
   }
 }
