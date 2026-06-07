@@ -230,8 +230,8 @@ const FIX_TEMPLATE: Record<FailureCategory, string> = {
     'Replace instant check with `await expect(locator).toBeVisible()` ' +
     'or `await expect(locator).toHaveText("…")` — both retry automatically.',
   State:
-    'Add `await page.waitForLoadState("networkidle")` before the assertion, ' +
-    'or use `await expect(page).toHaveURL(/pattern/)` which retries.',
+    'Replace generic load-state waits with retried assertions such as ' +
+    '`await expect(page).toHaveURL(/pattern/)` or `await expect(locator).toBeVisible()`.',
   'Network/API':
     'Use `await page.waitForResponse(url => url.includes("/endpoint"))` ' +
     'before assertions that depend on API data.',
@@ -522,7 +522,7 @@ function buildActions(failures: ClassifiedFailure[], summary: PatternSummary): s
     [summary.testDesign,  '🔴 Audit POM methods for `.isVisible()` / `setTimeout` — QA contract violations'],
     [summary.timing,      '🟠 Replace all `.textContent()` + `.toBe()` with `expect(locator).toHaveText()` — biggest stability gain'],
     [summary.selector,    '🟠 Replace brittle CSS selectors with `[data-test="…"]` or `getByRole()`'],
-    [summary.state,       '🟡 Add `waitForLoadState("networkidle")` before state-dependent assertions'],
+    [summary.state,       '🟡 Replace generic load-state waits with retried URL or locator assertions'],
     [summary.networkApi,  '🟡 Wrap API-dependent assertions with `page.waitForResponse()`'],
     [summary.assertion,   '🟢 Review expected values — ensure test data matches application state'],
   ];

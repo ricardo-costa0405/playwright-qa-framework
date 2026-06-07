@@ -1,5 +1,4 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { AntiTimeoutGuard } from '@utils/patterns/anti-timeout-guard';
 
 /**
  * Base Page Object following Clean Code and AAA-ready design
@@ -25,7 +24,6 @@ export abstract class BasePage {
   async navigate(url?: string): Promise<void> {
     const targetUrl = url || this.getUrl();
     await this.page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
-    await AntiTimeoutGuard.waitStrategies.networkIdle(this.page);
     await this.verifyPageLoaded();
   }
 
@@ -42,18 +40,21 @@ export abstract class BasePage {
 
   protected async clickAndNavigate(
     selector: string,
-    expectedUrl?: RegExp | string
+    expectedUrl: RegExp | string
   ): Promise<void> {
     const element = this.page.locator(selector);
     await expect(element).toBeVisible();
     await expect(element).toBeEnabled();
     await element.click();
+    await expect(this.page).toHaveURL(expectedUrl);
+  }
 
-    if (expectedUrl) {
-      await expect(this.page).toHaveURL(expectedUrl);
-    } else {
-      await this.page.waitForLoadState('networkidle');
-    }
+  protected async clickAndExpectVisible(
+    selector: string,
+    targetSelector: string
+  ): Promise<void> {
+    await this.clickAndWait(selector);
+    await expect(this.page.locator(targetSelector)).toBeVisible();
   }
 
   protected async fillInput(

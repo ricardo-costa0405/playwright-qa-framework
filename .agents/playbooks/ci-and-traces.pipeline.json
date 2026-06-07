@@ -1,0 +1,44 @@
+{
+  "id": "ci-and-traces-pipeline",
+  "version": "1.0.0",
+  "description": "Pipeline for adding or maintaining CI execution and trace artifacts.",
+  "rules": [
+    "../rules/playwright-quality.rules.json"
+  ],
+  "skills": [
+    "../skills/add-ci-test-suite.skill.md",
+    "../skills/trace-failure-analysis.skill.md"
+  ],
+  "stages": [
+    {
+      "id": "configure",
+      "name": "Configure suite",
+      "required": true,
+      "checks": [
+        "Define npm script for local execution.",
+        "Use Playwright config with trace retain-on-failure by default.",
+        "Provide an opt-in trace-on command for full local trace capture."
+      ]
+    },
+    {
+      "id": "ci",
+      "name": "Add CI workflow",
+      "required": true,
+      "checks": [
+        "Run on pull_request and push to protected branches.",
+        "Use concurrency cancellation.",
+        "Upload reports and failure artifacts."
+      ]
+    },
+    {
+      "id": "validate",
+      "name": "Validate",
+      "required": true,
+      "checks": [
+        "Run type-check.",
+        "Run validate:playbooks.",
+        "Run the target test suite or a focused smoke subset."
+      ]
+    }
+  ]
+}

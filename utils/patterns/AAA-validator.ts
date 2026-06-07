@@ -62,7 +62,7 @@ export class AAAValidator {
     if (this.containsTimeouts(testCode)) {
       errors.push(
         'Test contains hardcoded timeouts. Use state-based waits instead: ' +
-        'expect(), waitForLoadState(), waitForSelector()'
+        'expect(), toHaveURL(), waitForSelector()'
       );
     }
 

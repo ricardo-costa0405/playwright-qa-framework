@@ -1,0 +1,53 @@
+{
+  "id": "new-test-case-pipeline",
+  "version": "1.0.0",
+  "description": "Pipeline for creating a new Swag Labs Playwright e2e test case.",
+  "rules": [
+    "../rules/playwright-quality.rules.json"
+  ],
+  "skills": [
+    "../skills/create-e2e-test-case.skill.md",
+    "../skills/trace-failure-analysis.skill.md"
+  ],
+  "stages": [
+    {
+      "id": "scope",
+      "name": "Scope scenario",
+      "required": true,
+      "checks": [
+        "Confirm the scenario maps to real Swag Labs UI behavior.",
+        "Confirm whether the test belongs in web, web-mobile, or user-variants."
+      ]
+    },
+    {
+      "id": "design",
+      "name": "Design test",
+      "required": true,
+      "checks": [
+        "Choose existing fixture or define a minimal arrange path.",
+        "Identify page-object methods needed for reusable interactions.",
+        "Define stable visible assertions."
+      ]
+    },
+    {
+      "id": "implement",
+      "name": "Implement",
+      "required": true,
+      "checks": [
+        "Write AAA-structured spec.",
+        "Update page object only when duplication or reuse justifies it.",
+        "Avoid hardcoded waits and brittle selectors."
+      ]
+    },
+    {
+      "id": "verify",
+      "name": "Verify",
+      "required": true,
+      "checks": [
+        "Run validate:aaa.",
+        "Run validate:timeouts.",
+        "Run the smallest relevant Playwright test command."
+      ]
+    }
+  ]
+}

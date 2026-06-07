@@ -64,13 +64,11 @@ export class SauceDemoCheckoutPage extends BasePage {
   }
 
   async continueToOverview(): Promise<void> {
-    await this.continueButton.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndWait(this.SELECTORS.continueButton);
   }
 
   async cancelCheckout(): Promise<void> {
-    await this.cancelButton.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndNavigate(this.SELECTORS.cancelButton, /cart\.html/);
   }
 
   async hasError(): Promise<boolean> {
@@ -97,8 +95,7 @@ export class SauceDemoCheckoutPage extends BasePage {
   }
 
   async finishOrder(): Promise<void> {
-    await this.finishButton.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndNavigate(this.SELECTORS.finishButton, /checkout-complete/);
   }
 
   // ─── Complete screen ──────────────────────────────────────────────────────
@@ -112,7 +109,6 @@ export class SauceDemoCheckoutPage extends BasePage {
   }
 
   async backToProducts(): Promise<void> {
-    await this.backHomeButton.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndNavigate(this.SELECTORS.backHomeButton, /inventory\.html/);
   }
 }

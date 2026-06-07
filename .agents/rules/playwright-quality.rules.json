@@ -1,0 +1,37 @@
+{
+  "id": "playwright-quality-rules",
+  "version": "1.0.0",
+  "scope": "Swag Labs Playwright e2e framework",
+  "rules": [
+    {
+      "id": "target-real-app-behavior",
+      "severity": "required",
+      "description": "Create tests only for behavior that exists in the Swag Labs UI. Do not invent /api endpoints for saucedemo.com."
+    },
+    {
+      "id": "use-page-objects",
+      "severity": "required",
+      "description": "Put reusable interactions in pages/saucedemo page objects and keep specs focused on Arrange, Act, Assert."
+    },
+    {
+      "id": "prefer-stable-selectors",
+      "severity": "required",
+      "description": "Prefer data-test selectors, then roles, then visible text. Avoid XPath, nth-child, and brittle CSS paths."
+    },
+    {
+      "id": "state-based-waits",
+      "severity": "required",
+      "description": "Use Playwright auto-waiting and expect assertions. Never use waitForTimeout, sleep, or setTimeout in tests."
+    },
+    {
+      "id": "trace-on-failure",
+      "severity": "required",
+      "description": "CI must retain traces, screenshots, and HTML/JUnit reports for failed tests."
+    },
+    {
+      "id": "security-scope",
+      "severity": "advisory",
+      "description": "Security tests for this target should focus on UI input handling, protected route redirects, and session clearing because the app has no public REST API."
+    }
+  ]
+}

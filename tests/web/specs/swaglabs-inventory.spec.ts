@@ -51,6 +51,9 @@ test.describe('Inventory Feature @inventory', () => {
   });
 
   test('sort price low→high returns ascending prices', async ({ inventoryPage }) => {
+    // ==================== ARRANGE ====================
+    // inventoryPage fixture starts on the product listing
+
     // ==================== ACT ====================
     await inventoryPage.sortBy('lohi');
 
@@ -61,6 +64,9 @@ test.describe('Inventory Feature @inventory', () => {
   });
 
   test('sort price high→low returns descending prices', async ({ inventoryPage }) => {
+    // ==================== ARRANGE ====================
+    // inventoryPage fixture starts on the product listing
+
     // ==================== ACT ====================
     await inventoryPage.sortBy('hilo');
 

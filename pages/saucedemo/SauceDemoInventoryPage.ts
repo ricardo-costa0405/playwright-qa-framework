@@ -84,21 +84,20 @@ export class SauceDemoInventoryPage extends BasePage {
   // ─── Sorting ──────────────────────────────────────────────────────────────
 
   async sortBy(option: SortOption): Promise<void> {
-    await this.sortDropdown.selectOption(option);
-    await this.page.waitForLoadState('domcontentloaded');
+    const dropdown = this.page.locator(this.SELECTORS.sortDropdown);
+    await expect(dropdown).toBeVisible();
+    await dropdown.selectOption(option);
+    await expect(dropdown).toHaveValue(option);
   }
 
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   async goToCart(): Promise<void> {
-    await this.cartLink.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndNavigate(this.SELECTORS.cartLink, /cart\.html/);
   }
 
   async logout(): Promise<void> {
-    await this.burgerMenuButton.click();
-    await expect(this.logoutLink).toBeVisible();
-    await this.logoutLink.click();
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.clickAndExpectVisible(this.SELECTORS.burgerMenu, this.SELECTORS.logoutLink);
+    await this.clickAndNavigate(this.SELECTORS.logoutLink, /saucedemo\.com\/?$/);
   }
 }

@@ -1,4 +1,4 @@
-import { Page, type Response as PlaywrightResponse } from '@playwright/test';
+import { Page, expect, type Response as PlaywrightResponse } from '@playwright/test';
 
 /**
  * Anti-Timeout Guard
@@ -43,8 +43,8 @@ export class AntiTimeoutGuard {
       if (pattern.test(code)) {
         throw new Error(
           `${message}\n\nApproved waiting strategies:\n` +
-          '- await page.waitForLoadState("networkidle")\n' +
           '- await expect(element).toBeVisible()\n' +
+          '- await expect(page).toHaveURL(/expected-path/)\n' +
           '- await page.waitForSelector("[data-testid=foo]")\n' +
           '- await page.waitForResponse(url => url.includes("/api/data"))\n' +
           '- await page.waitForFunction(() => document.readyState === "complete")'
@@ -119,32 +119,9 @@ export class AntiTimeoutGuard {
       urlpattern: string | RegExp,
       count: number
     ): Promise<void> {
-      let received = 0;
-
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          page.off('response', listener);
-          reject(new Error(`Timed out waiting for ${count} API responses`));
-        }, 30000);
-
-        const listener = (response: PlaywrightResponse): void => {
-          const matches =
-            typeof urlpattern === 'string'
-              ? response.url().includes(urlpattern)
-              : urlpattern.test(response.url());
-
-          if (matches && response.ok()) {
-            received++;
-            if (received >= count) {
-              clearTimeout(timer);
-              page.off('response', listener);
-              resolve();
-            }
-          }
-        };
-
-        page.on('response', listener);
-      });
+      for (let index = 0; index < count; index++) {
+        await this.apiResponse(page, urlpattern);
+      }
     },
 
     /**
@@ -177,23 +154,10 @@ export class AntiTimeoutGuard {
      * Wait for custom condition with timeout
      */
     async customCondition(
-      page: Page,
       condition: () => Promise<boolean>,
       timeoutMs: number = 10000
     ): Promise<void> {
-      const startTime = Date.now();
-
-      while (Date.now() - startTime < timeoutMs) {
-        if (await condition()) {
-          return;
-        }
-
-        // Small delay to avoid busy-waiting
-        // eslint-disable-next-line no-restricted-syntax
-        await page.waitForTimeout(100);
-      }
-
-      throw new Error(`Custom condition timeout after ${timeoutMs}ms`);
+      await expect.poll(condition, { timeout: timeoutMs }).toBe(true);
     },
   };
 }

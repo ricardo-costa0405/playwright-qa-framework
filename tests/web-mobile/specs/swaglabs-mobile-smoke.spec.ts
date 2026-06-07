@@ -1,9 +1,31 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { SAUCE_CREDENTIALS } from '../../../fixtures/saucedemo-fixtures';
 
 const BASE_URL = 'https://www.saucedemo.com';
 const TEST_USERNAME = SAUCE_CREDENTIALS.standard.username;
 const TEST_PASSWORD = SAUCE_CREDENTIALS.standard.password;
+const SELECTORS = {
+  username: '[data-test="username"]',
+  password: '[data-test="password"]',
+  loginButton: '[data-test="login-button"]',
+  inventoryList: '[data-test="inventory-list"]',
+  inventoryItem: '[data-test="inventory-item"]',
+  inventoryItemName: '[data-test="inventory-item-name"]',
+  inventoryItemPrice: '[data-test="inventory-item-price"]',
+  cartBadge: '[data-test="shopping-cart-badge"]',
+  cartLink: '[data-test="shopping-cart-link"]',
+  checkout: '[data-test="checkout"]',
+  firstName: '[data-test="firstName"]',
+} as const;
+
+async function loginAsStandardUser(page: Page): Promise<void> {
+  await page.goto(BASE_URL);
+  await page.fill(SELECTORS.username, TEST_USERNAME);
+  await page.fill(SELECTORS.password, TEST_PASSWORD);
+  await page.click(SELECTORS.loginButton);
+  await expect(page).toHaveURL(/inventory\.html/);
+  await expect(page.locator(SELECTORS.inventoryList)).toBeVisible();
+}
 
 /**
  * Swag Labs — Mobile Smoke Tests @mobile @smoke
@@ -41,39 +63,35 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
 
     // ==================== ACT ====================
     // Tap on username field (touch interaction)
-    await page.tap('[data-test="username"]');
-    await page.type('[data-test="username"]', TEST_USERNAME);
+    await page.tap(SELECTORS.username);
+    await page.type(SELECTORS.username, TEST_USERNAME);
 
     // Tap on password field
-    await page.tap('[data-test="password"]');
-    await page.type('[data-test="password"]', TEST_PASSWORD);
+    await page.tap(SELECTORS.password);
+    await page.type(SELECTORS.password, TEST_PASSWORD);
 
     // Tap login button
-    await page.tap('[data-test="login-button"]');
+    await page.tap(SELECTORS.loginButton);
 
     // ==================== ASSERT ====================
     await expect(page).toHaveURL(/inventory\.html/);
-    await expect(page.locator('[data-test="inventory-list"]')).toBeVisible();
+    await expect(page.locator(SELECTORS.inventoryList)).toBeVisible();
     await expect(page.locator('[data-test="title"]')).toHaveText('Products');
   });
 
   test('mobile inventory page is responsive', async ({ page }) => {
     // ==================== ARRANGE ====================
-    await page.goto(BASE_URL);
-    await page.fill('[data-test="username"]', TEST_USERNAME);
-    await page.fill('[data-test="password"]', TEST_PASSWORD);
-    await page.click('[data-test="login-button"]');
-    await expect(page).toHaveURL(/inventory\.html/);
+    await loginAsStandardUser(page);
 
     // ==================== ACT ====================
-    const inventoryItems = await page.locator('[data-test="inventory-item"]').count();
+    const inventoryItems = page.locator(SELECTORS.inventoryItem);
 
     // ==================== ASSERT ====================
     // Should show products in responsive layout
-    expect(inventoryItems).toBeGreaterThan(0);
+    await expect(inventoryItems).toHaveCount(6);
 
     // Products should be visible in mobile viewport
-    const firstItem = page.locator('[data-test="inventory-item"]').first();
+    const firstItem = inventoryItems.first();
     await expect(firstItem).toBeVisible();
 
     // Image, name, price should be visible in mobile layout
@@ -81,20 +99,16 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
       firstItem.locator('img.inventory_item_img')
     ).toBeVisible();
     await expect(
-      firstItem.locator('[data-test="inventory-item-name"]')
+      firstItem.locator(SELECTORS.inventoryItemName)
     ).toBeVisible();
     await expect(
-      firstItem.locator('[data-test="inventory-item-price"]')
+      firstItem.locator(SELECTORS.inventoryItemPrice)
     ).toBeVisible();
   });
 
   test('mobile user can add item to cart with touch', async ({ page }) => {
     // ==================== ARRANGE ====================
-    await page.goto(BASE_URL);
-    await page.fill('[data-test="username"]', TEST_USERNAME);
-    await page.fill('[data-test="password"]', TEST_PASSWORD);
-    await page.click('[data-test="login-button"]');
-    await expect(page).toHaveURL(/inventory\.html/);
+    await loginAsStandardUser(page);
 
     // ==================== ACT ====================
     // Tap add to cart button
@@ -102,16 +116,12 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
 
     // ==================== ASSERT ====================
     // Badge should appear
-    await expect(page.locator('[data-test="shopping-cart-badge"]')).toHaveText('1');
+    await expect(page.locator(SELECTORS.cartBadge)).toHaveText('1');
   });
 
   test('mobile cart displays correctly on small screen', async ({ page }) => {
     // ==================== ARRANGE ====================
-    await page.goto(BASE_URL);
-    await page.fill('[data-test="username"]', TEST_USERNAME);
-    await page.fill('[data-test="password"]', TEST_PASSWORD);
-    await page.click('[data-test="login-button"]');
-    await expect(page).toHaveURL(/inventory\.html/);
+    await loginAsStandardUser(page);
 
     // Add two items
     await page.click('[data-test="add-to-cart-sauce-labs-backpack"]');
@@ -119,30 +129,26 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
 
     // ==================== ACT ====================
     // Tap cart icon
-    await page.tap('[data-test="shopping-cart-link"]');
+    await page.tap(SELECTORS.cartLink);
 
     // ==================== ASSERT ====================
     await expect(page).toHaveURL(/cart\.html/);
 
     // Cart items should be visible in mobile layout
-    const cartItems = await page.locator('[data-test="inventory-item"]').count();
-    expect(cartItems).toBe(2);
+    const cartItems = page.locator(SELECTORS.inventoryItem);
+    await expect(cartItems).toHaveCount(2);
 
     // Items should be stacked vertically in mobile
-    const firstItem = page.locator('[data-test="inventory-item"]').first();
+    const firstItem = cartItems.first();
     await expect(firstItem).toBeVisible();
   });
 
   test('mobile sorting dropdown works with touch', async ({ page }) => {
     // ==================== ARRANGE ====================
-    await page.goto(BASE_URL);
-    await page.fill('[data-test="username"]', TEST_USERNAME);
-    await page.fill('[data-test="password"]', TEST_PASSWORD);
-    await page.click('[data-test="login-button"]');
-    await expect(page).toHaveURL(/inventory\.html/);
+    await loginAsStandardUser(page);
 
     const originalNames = await page
-      .locator('[data-test="inventory-item-name"]')
+      .locator(SELECTORS.inventoryItemName)
       .allTextContents();
 
     // ==================== ACT ====================
@@ -152,7 +158,7 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
 
     // ==================== ASSERT ====================
     const sortedNames = await page
-      .locator('[data-test="inventory-item-name"]')
+      .locator(SELECTORS.inventoryItemName)
       .allTextContents();
 
     // Names should be sorted differently
@@ -161,37 +167,29 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
 
   test('mobile checkout flow completes successfully', async ({ page }) => {
     // ==================== ARRANGE ====================
-    await page.goto(BASE_URL);
-    await page.fill('[data-test="username"]', TEST_USERNAME);
-    await page.fill('[data-test="password"]', TEST_PASSWORD);
-    await page.click('[data-test="login-button"]');
-    await expect(page).toHaveURL(/inventory\.html/);
+    await loginAsStandardUser(page);
 
     // Add item
     await page.click('[data-test="add-to-cart-sauce-labs-backpack"]');
 
     // Go to cart
-    await page.tap('[data-test="shopping-cart-link"]');
+    await page.tap(SELECTORS.cartLink);
     await expect(page).toHaveURL(/cart\.html/);
 
     // ==================== ACT ====================
     // Tap checkout on mobile
-    await page.tap('[data-test="checkout"]');
+    await page.tap(SELECTORS.checkout);
 
     // ==================== ASSERT ====================
     await expect(page).toHaveURL(/checkout-step-one/);
 
     // Checkout form should be visible on mobile
-    await expect(page.locator('[data-test="firstName"]')).toBeVisible();
+    await expect(page.locator(SELECTORS.firstName)).toBeVisible();
   });
 
   test('mobile hamburger menu is accessible', async ({ page }) => {
     // ==================== ARRANGE ====================
-    await page.goto(BASE_URL);
-    await page.fill('[data-test="username"]', TEST_USERNAME);
-    await page.fill('[data-test="password"]', TEST_PASSWORD);
-    await page.click('[data-test="login-button"]');
-    await expect(page).toHaveURL(/inventory\.html/);
+    await loginAsStandardUser(page);
 
     // ==================== ACT ====================
     // Tap hamburger menu (mobile-specific UI)
@@ -205,15 +203,11 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
 
   test('mobile user can navigate back using browser/UI controls', async ({ page }) => {
     // ==================== ARRANGE ====================
-    await page.goto(BASE_URL);
-    await page.fill('[data-test="username"]', TEST_USERNAME);
-    await page.fill('[data-test="password"]', TEST_PASSWORD);
-    await page.click('[data-test="login-button"]');
-    await expect(page).toHaveURL(/inventory\.html/);
+    await loginAsStandardUser(page);
 
     // Add item and go to cart
     await page.click('[data-test="add-to-cart-sauce-labs-backpack"]');
-    await page.tap('[data-test="shopping-cart-link"]');
+    await page.tap(SELECTORS.cartLink);
     await expect(page).toHaveURL(/cart\.html/);
 
     // ==================== ACT ====================
@@ -222,7 +216,7 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
 
     // ==================== ASSERT ====================
     await expect(page).toHaveURL(/inventory\.html/);
-    await expect(page.locator('[data-test="inventory-list"]')).toBeVisible();
+    await expect(page.locator(SELECTORS.inventoryList)).toBeVisible();
   });
 
   test('mobile form keyboard appears on touch input focus', async ({ page }) => {
@@ -231,7 +225,7 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
 
     // ==================== ACT ====================
     // Focus on input field (will trigger mobile keyboard)
-    await page.tap('[data-test="username"]');
+    await page.tap(SELECTORS.username);
 
     // ==================== ASSERT ====================
     // Input should be focused
@@ -240,9 +234,9 @@ test.describe('Mobile Smoke Tests @mobile @smoke', () => {
     expect(focused).toBe('user-name');
 
     // Should be able to type
-    await page.type('[data-test="username"]', TEST_USERNAME);
+    await page.type(SELECTORS.username, TEST_USERNAME);
     const value = await page
-      .locator('[data-test="username"]')
+      .locator(SELECTORS.username)
       .inputValue();
     expect(value).toBe(TEST_USERNAME);
   });
