@@ -86,20 +86,6 @@ npm run report:serve      # Open Playwright HTML report
 npm run report:allure     # Generate and open Allure report
 ```
 
----
-
-## Code Quality
-
-```bash
-npm run lint              # ESLint
-npm run format            # Prettier
-npm run type-check        # TypeScript (no emit)
-npm run validate:aaa      # Check AAA structure in all specs
-npm run validate:timeouts # Detect hardcoded waits
-```
-
----
-
 ## CI
 
 Three GitHub Actions workflows run on push and pull requests to `main`:

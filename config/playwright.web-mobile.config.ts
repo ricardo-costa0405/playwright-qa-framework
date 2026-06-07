@@ -13,6 +13,7 @@ const TIMEOUT        = parseInt(process.env.TIMEOUT        || '30000');
 const EXPECT_TIMEOUT = parseInt(process.env.EXPECT_TIMEOUT || '10000');
 const CI             = process.env.CI === 'true';
 const isLocalhost    = BASE_URL.includes('localhost');
+const TRACE_MODE     = process.env.PW_TRACE_MODE || 'retain-on-failure';
 
 /**
  * Web Mobile Platform Configuration
@@ -36,7 +37,7 @@ export default defineConfig({
 
   use: {
     baseURL:           BASE_URL,
-    trace:             'retain-on-failure',
+    trace:             TRACE_MODE as 'on' | 'off' | 'retain-on-failure' | 'on-first-retry',
     screenshot:        'only-on-failure',
     video: {
       mode: 'retain-on-failure',

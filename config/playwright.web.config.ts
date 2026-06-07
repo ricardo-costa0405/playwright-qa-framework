@@ -14,6 +14,7 @@ const BASE_URL        = process.env.BASE_URL    || 'https://www.saucedemo.com';
 const TIMEOUT         = parseInt(process.env.TIMEOUT        || '30000');
 const EXPECT_TIMEOUT  = parseInt(process.env.EXPECT_TIMEOUT || '10000');
 const CI              = process.env.CI === 'true';
+const TRACE_MODE      = process.env.PW_TRACE_MODE || 'retain-on-failure';
 
 // Screencast dir — resolved from project root so it always lands in the right place
 const SCREENCAST_DIR  = path.resolve(__dirname, '../reports/screencast-debug');
@@ -51,7 +52,7 @@ export default defineConfig({
 
   use: {
     baseURL:          BASE_URL,
-    trace:            'retain-on-failure',
+    trace:            TRACE_MODE as 'on' | 'off' | 'retain-on-failure' | 'on-first-retry',
     screenshot:       'only-on-failure',
     actionTimeout:    0,   // rely on Playwright auto-waiting
     navigationTimeout: 0,  // let assertions drive readiness checks

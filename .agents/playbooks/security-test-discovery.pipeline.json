@@ -1,0 +1,44 @@
+{
+  "id": "security-test-discovery-pipeline",
+  "version": "1.0.0",
+  "description": "Pipeline for proposing security-oriented UI tests for the static Swag Labs app.",
+  "rules": [
+    "../rules/playwright-quality.rules.json"
+  ],
+  "skills": [
+    "../skills/create-e2e-test-case.skill.md",
+    "../skills/trace-failure-analysis.skill.md"
+  ],
+  "stages": [
+    {
+      "id": "map-attack-surface",
+      "name": "Map attack surface",
+      "required": true,
+      "checks": [
+        "List UI inputs and protected browser routes.",
+        "Exclude backend/API checks unless a real endpoint is discovered.",
+        "Choose tests that can assert user-visible security behavior."
+      ]
+    },
+    {
+      "id": "create-cases",
+      "name": "Create cases",
+      "required": true,
+      "checks": [
+        "Cover login validation, route protection, logout/session clearing, and checkout input handling.",
+        "Use harmless payloads for XSS-style input handling checks.",
+        "Assert that payloads are displayed as text or rejected, never executed."
+      ]
+    },
+    {
+      "id": "verify",
+      "name": "Verify",
+      "required": true,
+      "checks": [
+        "Run focused security-tagged tests.",
+        "Run validation scripts.",
+        "Attach traces on failure."
+      ]
+    }
+  ]
+}

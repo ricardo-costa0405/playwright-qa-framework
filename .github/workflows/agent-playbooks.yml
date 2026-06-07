@@ -1,0 +1,42 @@
+name: 'Agent Playbooks'
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: agent-playbooks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Validate agent playbooks
+        run: npm run validate:playbooks
+
+      - name: Type-check framework
+        run: npm run type-check
+
+      - name: Validate test patterns
+        run: npm run validate:aaa
+
+      - name: Validate timeout rules
+        run: npm run validate:timeouts

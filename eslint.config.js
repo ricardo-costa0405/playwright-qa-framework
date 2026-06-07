@@ -73,7 +73,7 @@ export default [
 
   // ── Utility scripts — relax length/complexity for analysis tools ──────────
   {
-    files: ["utils/reporters/**/*.ts", "utils/patterns/**/*.ts"],
+    files: ["utils/reporters/**/*.ts", "utils/patterns/**/*.ts", "utils/agents/**/*.ts"],
     rules: {
       "max-lines-per-function": ["error", { max: 120, skipBlankLines: true, skipComments: true }],
       complexity: ["error", 20]
