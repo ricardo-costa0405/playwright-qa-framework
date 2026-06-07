@@ -65,10 +65,14 @@ export class SauceDemoCartPage extends BasePage {
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   async continueShopping(): Promise<void> {
-    await this.clickAndNavigate(this.SELECTORS.continueShopping, /inventory\.html/);
+    await expect(this.continueShoppingButton).toBeVisible();
+    await this.continueShoppingButton.click();
+    await expect(this.page).toHaveURL(/inventory\.html/);
   }
 
   async proceedToCheckout(): Promise<void> {
-    await this.clickAndNavigate(this.SELECTORS.checkoutButton, /checkout-step-one/);
+    await expect(this.checkoutButton).toBeVisible();
+    await this.checkoutButton.click();
+    await expect(this.page).toHaveURL(/checkout-step-one/);
   }
 }

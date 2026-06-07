@@ -64,11 +64,14 @@ export class SauceDemoCheckoutPage extends BasePage {
   }
 
   async continueToOverview(): Promise<void> {
-    await this.clickAndWait(this.SELECTORS.continueButton);
+    await expect(this.continueButton).toBeVisible();
+    await this.continueButton.click();
   }
 
   async cancelCheckout(): Promise<void> {
-    await this.clickAndNavigate(this.SELECTORS.cancelButton, /cart\.html/);
+    await expect(this.cancelButton).toBeVisible();
+    await this.cancelButton.click();
+    await expect(this.page).toHaveURL(/cart\.html/);
   }
 
   async hasError(): Promise<boolean> {
@@ -95,7 +98,9 @@ export class SauceDemoCheckoutPage extends BasePage {
   }
 
   async finishOrder(): Promise<void> {
-    await this.clickAndNavigate(this.SELECTORS.finishButton, /checkout-complete/);
+    await expect(this.finishButton).toBeVisible();
+    await this.finishButton.click();
+    await expect(this.page).toHaveURL(/checkout-complete/);
   }
 
   // ─── Complete screen ──────────────────────────────────────────────────────
@@ -109,6 +114,8 @@ export class SauceDemoCheckoutPage extends BasePage {
   }
 
   async backToProducts(): Promise<void> {
-    await this.clickAndNavigate(this.SELECTORS.backHomeButton, /inventory\.html/);
+    await expect(this.backHomeButton).toBeVisible();
+    await this.backHomeButton.click();
+    await expect(this.page).toHaveURL(/inventory\.html/);
   }
 }
