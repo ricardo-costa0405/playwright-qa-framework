@@ -15,7 +15,7 @@ import {
  *   ✓ Timeouts are handled gracefully with proper retry logic
  *   ✓ Page navigation waits exceed expectations without breaking
  *   ✓ Checkout completes despite intermittent slowness
- *   ✓ Network waterfall shows delays but operations eventually succeed
+ *   ✓ Multi-page navigation shows cumulative client-side delay
  *   ✓ Cart operations complete with patience
  *   ✓ Load time metrics are collected for SLA verification
  *
@@ -23,6 +23,12 @@ import {
  *
  * Note: performance_glitch_user simulates slow API responses (up to 3s delays).
  * Tests should use longer timeouts and measure performance.
+ *
+ * ⚠ False-positive guard: these tests do NOT use the `loginPage` fixture
+ * because the fixture pre-navigates to the login page, consuming the
+ * performance_glitch_user's page load delay before the timing measurement
+ * begins.  Each test creates its own SauceDemoLoginPage instance so that
+ * Date.now() captures the full login experience including the initial load.
  */
 
 test.describe('Performance Glitch User Variant @performance-user', () => {
@@ -58,34 +64,39 @@ test.describe('Performance Glitch User Variant @performance-user', () => {
 
   // ─── Login performance ────────────────────────────────────────────────────
 
-  test('performance_user login completes despite 3s+ server delays', async ({ loginPage, page }) => {
+  test('performance_user login completes despite 3s+ server delays', async ({ page }) => {
     // ==================== ARRANGE ====================
+    const loginPage = new SauceDemoLoginPage(page);
     const { username, password } = SAUCE_CREDENTIALS.glitch;
-    const startTime = Date.now();
 
     // ==================== ACT ====================
+    // Timer starts before navigate() so the initial performance glitch page-load
+    // delay (≈3s) is captured in the measurement.
+    const startTime = Date.now();
+    await loginPage.navigate();
     await loginPage.login(username, password);
+    await expect(page).toHaveURL(/inventory\.html/);
+    await expect(page.locator(inventoryList)).toBeVisible();
     const loginDuration = Date.now() - startTime;
 
     // ==================== ASSERT ====================
-    await expect(page).toHaveURL(/inventory\.html/);
-
     // Performance glitch user experiences delays > 2s on login
     expect(loginDuration).toBeGreaterThan(2000);
-    expect(loginDuration).toBeLessThan(15000); // Should not exceed 15s
-
-    await expect(page.locator('[data-test="inventory-list"]')).toBeVisible();
+    expect(loginDuration).toBeLessThan(15000);
   });
 
   // ─── Inventory loading with performance degradation ──────────────────────
 
-  test('performance_user inventory loads despite delayed responses', async ({ loginPage, page }) => {
+  test('performance_user inventory loads despite delayed responses', async ({ page }) => {
     // ==================== ARRANGE ====================
+    const loginPage = new SauceDemoLoginPage(page);
     const { username, password } = SAUCE_CREDENTIALS.glitch;
 
     // ==================== ACT ====================
-    // Timer starts before login — performance glitch delay occurs during login/navigation
+    // Timer starts before navigate — performance glitch delay occurs during
+    // initial load, login, and redirect.
     const loadStartTime = Date.now();
+    await loginPage.navigate();
     await loginPage.login(username, password);
     await expect(page).toHaveURL(/inventory\.html/);
     await expect(page.locator(inventoryList)).toBeVisible();
@@ -103,39 +114,52 @@ test.describe('Performance Glitch User Variant @performance-user', () => {
     expect(prices.length).toBe(6);
   });
 
-  // ─── Network waterfall measurement ────────────────────────────────────────
+  // ─── Page-level navigation degradation measurement ─────────────────────────
+  //
+  // NOTE: SauceDemo's performance_glitch_user injects client-side delays on
+  // page navigations.  Individual HTTP request timings do NOT show degradation
+  // (the delay is applied at the routing level, not the network layer).
+  // This test measures overall page-load wall-clock time instead.
 
-  test('performance_user network requests show degradation patterns', async ({ page }) => {
+  test('performance_user multi-page navigation shows cumulative delay', async ({ page }) => {
     // ==================== ARRANGE ====================
-    const requests: { url: string; duration: number }[] = [];
-
-    // Capture network timing
-    page.on('response', (response) => {
-      const timing = response.request().timing();
-      if (timing) {
-        requests.push({
-          url: response.url(),
-          duration: timing.responseEnd - timing.requestStart,
-        });
-      }
-    });
+    const { inventoryPage } = await loginAsPerformanceUser(page);
+    const cartPage = new SauceDemoCartPage(page);
+    const timings: { phase: string; duration: number }[] = [];
 
     // ==================== ACT ====================
-    await loginAsPerformanceUser(page);
+
+    // Phase 1 — inventory → cart (navigation delay applies)
+    let t = Date.now();
+    await inventoryPage.goToCart();
+    timings.push({ phase: 'inventory→cart', duration: Date.now() - t });
+    await expect(page).toHaveURL(/cart\.html/);
+
+    // Phase 2 — cart → continue-shopping back to inventory
+    t = Date.now();
+    await cartPage.continueShopping();
+    timings.push({ phase: 'cart→inventory', duration: Date.now() - t });
+    await expect(page).toHaveURL(/inventory\.html/);
+    await expect(page.locator(inventoryList)).toBeVisible();
+
+    // Phase 3 — add item + go to cart again
+    t = Date.now();
+    await inventoryPage.addItemToCart('Sauce Labs Backpack');
+    await inventoryPage.goToCart();
+    timings.push({ phase: 'add-to-cart→cart', duration: Date.now() - t });
+    await expect(page).toHaveURL(/cart\.html/);
 
     // ==================== ASSERT ====================
-    expect(requests.length).toBeGreaterThan(0);
+    // Each client-side navigation should incur ≈3s delay from the glitch user.
+    // At least one phase should exceed 2s — otherwise no degradation occurred.
+    const slowestPhase = Math.max(...timings.map((t) => t.duration));
+    expect(slowestPhase).toBeGreaterThan(2000);
 
-    // Log performance metrics — saucedemo performance delay is applied client-side
-    // so it manifests as overall page load time, not individual slow network requests
-    const slowRequests = requests.filter((r) => r.duration > 1000);
-    console.log(`Total Requests: ${requests.length}`);
-    console.log(`Slow Requests (>1s): ${slowRequests.length}`);
-    if (requests.length > 0) {
-      console.log(
-        `Slowest Request: ${Math.max(...requests.map((r) => r.duration))}ms`
-      );
+    // Log for diagnostics
+    for (const { phase, duration } of timings) {
+      console.log(`  ${phase}: ${duration}ms`);
     }
+    console.log(`  Slowest phase: ${slowestPhase}ms`);
   });
 
   // ─── Add to cart with performance degradation ────────────────────────────
@@ -189,6 +213,10 @@ test.describe('Performance Glitch User Variant @performance-user', () => {
   });
 
   // ─── Sorting with performance impact ──────────────────────────────────────
+  // NOTE: sorting on SauceDemo is a client-side reorder of the existing DOM
+  // (no navigation, no network request).  The performance_glitch_user injects
+  // delays only on page navigations, so sort operations are NOT measurably
+  // slower with this user.  The test validates correct sort results instead.
 
   test('performance_user sort operations complete despite API latency', async ({ page }) => {
     // ==================== ARRANGE ====================
@@ -208,10 +236,8 @@ test.describe('Performance Glitch User Variant @performance-user', () => {
     const sorted = [...names].sort().reverse();
     expect(names).toEqual(sorted);
 
-    // Sort operation should show latency
-    expect(sortDuration).toBeGreaterThan(1000);
-    expect(sortDuration).toBeLessThan(30000);
-
+    // Sort is a client-side DOM reorder — not affected by performance glitch.
+    // Log the duration for observability but don't assert on it.
     console.log(`Sort Duration: ${sortDuration}ms`);
   });
 
