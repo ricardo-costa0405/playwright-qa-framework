@@ -121,3 +121,4 @@ Used during development for programmatic browser control from an AI agent contex
 
 **Pros:** Allows AI-assisted element discovery with real browser context; respects the selector priority hierarchy (`data-test` → role → text) when querying. Useful for validating selectors against the live DOM before committing them to page objects.
 **Cons:** Requires the MCP server running locally (`.mcp/servers.json`). Not a replacement for the test runner — used only for authoring assistance, not execution.
+// Test: E2E flow verification - Mon Jun 15 18:41:44 UTC 2026
