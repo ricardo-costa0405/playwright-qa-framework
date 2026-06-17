@@ -35,6 +35,7 @@ const SCREENCAST_DIR  = path.resolve(__dirname, '../reports/screencast-debug');
  * Anti-patterns guide: utils/patterns/anti-patterns-guide.ts
  */
 export default defineConfig({
+  globalSetup: '../global-setup.ts',
   testDir:   '../tests/web/specs',
   testMatch: '**/*.spec.ts',
 
@@ -53,6 +54,7 @@ export default defineConfig({
 
   use: {
     baseURL:          BASE_URL,
+    storageState:     '../.auth/standard_user.json',
     trace:            TRACE_MODE as 'on' | 'off' | 'retain-on-failure' | 'on-first-retry',
     screenshot:       'only-on-failure',
     actionTimeout:    0,   // rely on Playwright auto-waiting
