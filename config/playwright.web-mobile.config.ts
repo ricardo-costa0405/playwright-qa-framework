@@ -39,7 +39,7 @@ export default defineConfig({
 
   use: {
     baseURL:           BASE_URL,
-    storageState:      '../.auth/standard_user.json',
+    storageState:      '.auth/standard_user.json',
     trace:             TRACE_MODE as 'on' | 'off' | 'retain-on-failure' | 'on-first-retry',
     screenshot:        'only-on-failure',
     video: {
