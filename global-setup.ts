@@ -5,14 +5,56 @@
  * .auth/standard_user.json. Every project then injects this state
  * via storageState, eliminating 80+ login operations per CI run.
  *
- * Usage: added to playwright.config.ts under globalSetup.
+ * Browser-agnostic: tries chromium first (fastest), then firefox,
+ * then webkit. The storageState JSON is identical across browsers,
+ * so whichever browser creates it is irrelevant — all projects
+ * consume the same file. This avoids crashes in CI matrix jobs
+ * that only install a single browser (e.g. webkit-only).
+ *
+ * Usage: added to playwright configs under globalSetup.
  */
-import { chromium, type FullConfig } from '@playwright/test';
+import {
+  chromium,
+  firefox,
+  webkit,
+  type FullConfig,
+  type BrowserType,
+  type Browser,
+} from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 
 const AUTH_DIR  = path.resolve(import.meta.dirname ?? __dirname, '.auth');
 const AUTH_FILE = path.join(AUTH_DIR, 'standard_user.json');
+
+// ── Browser priority: chromium → firefox → webkit ──────────────
+const BROWSERS: Array<{ name: string; type: BrowserType<Record<string, never>> }> = [
+  { name: 'chromium', type: chromium },
+  { name: 'firefox',  type: firefox },
+  { name: 'webkit',   type: webkit },
+];
+
+async function launchFirstAvailable(): Promise<{
+  browser: Browser;
+  browserName: string;
+}> {
+  const errors: string[] = [];
+
+  for (const { name, type } of BROWSERS) {
+    try {
+      const browser = await type.launch();
+      console.log(`✓ Global setup: using ${name} for auth`);
+      return { browser, browserName: name };
+    } catch (err) {
+      errors.push(`${name}: ${(err as Error).message.split('\n')[0]}`);
+    }
+  }
+
+  throw new Error(
+    `No Playwright browser available. Tried:\n${errors.map((e) => `  - ${e}`).join('\n')}\n` +
+      'Run: npx playwright install',
+  );
+}
 
 async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use?.baseURL ?? 'https://www.saucedemo.com';
@@ -20,7 +62,7 @@ async function globalSetup(config: FullConfig): Promise<void> {
   // Ensure .auth directory exists
   await fs.promises.mkdir(AUTH_DIR, { recursive: true });
 
-  const browser = await chromium.launch();
+  const { browser } = await launchFirstAvailable();
   const context = await browser.newContext({ baseURL });
   const page    = await context.newPage();
 
