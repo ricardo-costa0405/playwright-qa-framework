@@ -19,10 +19,52 @@ export const SAUCE_CREDENTIALS = {
   glitch:   { username: 'performance_glitch_user',  password: 'secret_sauce' },
 } as const;
 
+// ─── Session validation helper ──────────────────────────────────────────────
+
+/**
+ * Validates that the current page is authenticated.
+ * Fails fast with a clear "authentication failed" message instead of
+ * a cryptic "element not found" downstream.
+ */
+async function validateSession(page: import('@playwright/test').Page): Promise<void> {
+  await expect(
+    page.locator('[data-test="inventory-container"]'),
+    '❌ Authentication failed — inventory container not found. Check BasePage URL or credentials.'
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page.locator('[data-test="title"]')
+  ).toHaveText('Products');
+}
+
+// ─── Full storage cleanup ───────────────────────────────────────────────────
+
+/**
+ * Clears all browser storage to prevent cross-test leaks.
+ * cookies + localStorage + sessionStorage.
+ *
+ * Why: SPA auth tokens increasingly live in localStorage.
+ * clearCookies() alone leaves stale tokens that non-deterministically
+ * bleed into dependent tests — near-impossible to debug in CI.
+ */
+async function clearAllStorage(page: import('@playwright/test').Page): Promise<void> {
+  await page.context().clearCookies();
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+}
+
 // ─── Fixture types ───────────────────────────────────────────────────────────
 type SauceDemoFixtures = {
   /** Arrives at the login page, ready to interact */
   loginPage: SauceDemoLoginPage;
+
+  /**
+   * Authenticated page fixture — logs in once as standard_user.
+   * All dependent fixtures (inventoryPage, cartPage, checkoutPage)
+   * extend from this instead of duplicating the login flow.
+   */
+  authenticatedPage: import('@playwright/test').Page;
 
   /** Already authenticated as standard_user, on the inventory page */
   inventoryPage: SauceDemoInventoryPage;
@@ -43,63 +85,61 @@ export const test = base.extend<SauceDemoFixtures>({
     await use(loginPage);
   },
 
-  inventoryPage: async ({ page }, use) => {
-    // UI login — fastest reliable approach for SauceDemo (no token/cookie trick)
-    const loginPage = new SauceDemoLoginPage(page);
-    await loginPage.navigate();
-    await loginPage.login(
-      SAUCE_CREDENTIALS.standard.username,
-      SAUCE_CREDENTIALS.standard.password
-    );
+  // ── Single source of truth for authentication ──────────────────────────
+  // inventoryPage, cartPage, checkoutPage all depend on this.
+  // No more 3 independent login flows per test.
+  authenticatedPage: async ({ page }, use) => {
+    // If storageState was injected (global setup), we may already be on /inventory.html.
+    // Navigate to base and check — only login if not already authenticated.
+    const alreadyOnInventory = page.url().includes('/inventory.html');
+    if (!alreadyOnInventory) {
+      const loginPage = new SauceDemoLoginPage(page);
+      await loginPage.navigate();
+      await loginPage.login(
+        SAUCE_CREDENTIALS.standard.username,
+        SAUCE_CREDENTIALS.standard.password
+      );
+    }
+    await validateSession(page);
+    await use(page);
 
-    const inventoryPage = new SauceDemoInventoryPage(page);
-    await expect(page.locator('.inventory_list')).toBeVisible();
-    await use(inventoryPage);
-
-    await page.context().clearCookies();
+    // Full storage cleanup — not just cookies
+    await clearAllStorage(page);
   },
 
-  cartPage: async ({ page }, use) => {
-    const loginPage = new SauceDemoLoginPage(page);
-    await loginPage.navigate();
-    await loginPage.login(
-      SAUCE_CREDENTIALS.standard.username,
-      SAUCE_CREDENTIALS.standard.password
-    );
+  inventoryPage: async ({ authenticatedPage }, use) => {
+    const inventoryPage = new SauceDemoInventoryPage(authenticatedPage);
+    // Already on /inventory.html from authenticatedPage login
+    await expect(authenticatedPage.locator('.inventory_list')).toBeVisible();
+    await use(inventoryPage);
+    // Storage cleanup handled by authenticatedPage teardown
+  },
 
-    const inventoryPage = new SauceDemoInventoryPage(page);
-    await expect(page.locator('.inventory_list')).toBeVisible();
+  cartPage: async ({ authenticatedPage }, use) => {
+    const inventoryPage = new SauceDemoInventoryPage(authenticatedPage);
+    await expect(authenticatedPage.locator('.inventory_list')).toBeVisible();
     await inventoryPage.goToCart();
 
-    const cartPage = new SauceDemoCartPage(page);
-    await expect(page.locator('.title')).toHaveText('Your Cart');
+    const cartPage = new SauceDemoCartPage(authenticatedPage);
+    await expect(authenticatedPage.locator('.title')).toHaveText('Your Cart');
     await use(cartPage);
-
-    await page.context().clearCookies();
+    // Storage cleanup handled by authenticatedPage teardown
   },
 
-  checkoutPage: async ({ page }, use) => {
-    const loginPage = new SauceDemoLoginPage(page);
-    await loginPage.navigate();
-    await loginPage.login(
-      SAUCE_CREDENTIALS.standard.username,
-      SAUCE_CREDENTIALS.standard.password
-    );
-
-    const inventoryPage = new SauceDemoInventoryPage(page);
-    await expect(page.locator('.inventory_list')).toBeVisible();
+  checkoutPage: async ({ authenticatedPage }, use) => {
+    const inventoryPage = new SauceDemoInventoryPage(authenticatedPage);
+    await expect(authenticatedPage.locator('.inventory_list')).toBeVisible();
     // Add one item so the cart isn't empty before checkout
     await inventoryPage.addItemToCart('Sauce Labs Backpack');
     await inventoryPage.goToCart();
 
-    const cartPage = new SauceDemoCartPage(page);
+    const cartPage = new SauceDemoCartPage(authenticatedPage);
     await cartPage.proceedToCheckout();
 
-    const checkoutPage = new SauceDemoCheckoutPage(page);
-    await expect(page.locator('[data-test="firstName"]')).toBeVisible();
+    const checkoutPage = new SauceDemoCheckoutPage(authenticatedPage);
+    await expect(authenticatedPage.locator('[data-test="firstName"]')).toBeVisible();
     await use(checkoutPage);
-
-    await page.context().clearCookies();
+    // Storage cleanup handled by authenticatedPage teardown
   },
 
 });

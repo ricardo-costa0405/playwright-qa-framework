@@ -21,6 +21,7 @@ const TRACE_MODE     = process.env.PW_TRACE_MODE || 'retain-on-failure';
  * Touch support and mobile-specific viewports
  */
 export default defineConfig({
+  globalSetup:   '../global-setup.ts',
   testDir:      '../tests/web-mobile/specs',
   testMatch:    '**/*.spec.ts',
   fullyParallel: true,
@@ -38,6 +39,7 @@ export default defineConfig({
 
   use: {
     baseURL:           BASE_URL,
+    storageState:      '../.auth/standard_user.json',
     trace:             TRACE_MODE as 'on' | 'off' | 'retain-on-failure' | 'on-first-retry',
     screenshot:        'only-on-failure',
     video: {

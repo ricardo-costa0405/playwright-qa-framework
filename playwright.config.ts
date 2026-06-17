@@ -29,6 +29,7 @@ const CI              = process.env.CI === 'true';
 
 // Re-export the web configuration directly
 export default defineConfig({
+  globalSetup: './global-setup.ts',
   testDir: './tests/web/specs',
   testMatch: '**/*.spec.ts',
   fullyParallel: true,
@@ -44,6 +45,7 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
+    storageState: '.auth/standard_user.json',
     trace: CI ? 'retain-on-failure-and-retries' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     actionTimeout: 0,
