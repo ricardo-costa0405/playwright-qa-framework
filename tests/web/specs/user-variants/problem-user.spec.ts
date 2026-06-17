@@ -1,4 +1,11 @@
+import { type Page } from '@playwright/test';
 import { test, expect, SAUCE_CREDENTIALS } from '../../../../fixtures/saucedemo-fixtures';
+import {
+  SauceDemoCartPage,
+  SauceDemoCheckoutPage,
+  SauceDemoInventoryPage,
+  SauceDemoLoginPage,
+} from '../../../../pages/saucedemo';
 
 /**
  * Swag Labs — Problem User Variant Tests @problem-user
@@ -14,7 +21,35 @@ import { test, expect, SAUCE_CREDENTIALS } from '../../../../fixtures/saucedemo-
  *
  * Note: problem_user simulates visual inconsistencies and data rendering issues
  * that occur when backend fails to sync with UI properly.
+ *
+ * ⚠ False-positive guard: these tests do NOT use the inventoryPage,
+ * cartPage, or checkoutPage fixtures because those fixtures always log in
+ * as standard_user.  Each test calls loginAsProblemUser() to ensure the
+ * problem_user's glitchy session is actually being exercised.
  */
+
+const inventoryList = '[data-test="inventory-list"]';
+const cartBadge = '[data-test="shopping-cart-badge"]';
+const cartItemLabel = '.cart_item_label';
+
+async function loginAsProblemUser(page: Page): Promise<{
+  loginPage: SauceDemoLoginPage;
+  inventoryPage: SauceDemoInventoryPage;
+}> {
+  const loginPage = new SauceDemoLoginPage(page);
+  await loginPage.navigate();
+  await loginPage.login(
+    SAUCE_CREDENTIALS.problem.username,
+    SAUCE_CREDENTIALS.problem.password
+  );
+  await expect(page).toHaveURL(/inventory\.html/);
+  await expect(page.locator(inventoryList)).toBeVisible();
+
+  return {
+    loginPage,
+    inventoryPage: new SauceDemoInventoryPage(page),
+  };
+}
 
 test.describe('Problem User Variant @problem-user', () => {
 
@@ -24,23 +59,25 @@ test.describe('Problem User Variant @problem-user', () => {
 
   // ─── Login and inventory glitches ───────────────────────────────────────
 
-  test('problem_user logs in successfully despite backend glitches', async ({ loginPage, page }) => {
+  test('problem_user logs in successfully despite backend glitches', async ({ page }) => {
     // ==================== ARRANGE ====================
     const { username, password } = SAUCE_CREDENTIALS.problem;
+    const loginPage = new SauceDemoLoginPage(page);
 
     // ==================== ACT ====================
+    await loginPage.navigate();
     await loginPage.login(username, password);
 
     // ==================== ASSERT ====================
     await expect(page).toHaveURL(/inventory\.html/);
     await expect(page).toHaveTitle('Swag Labs');
     // Despite visual glitches, inventory list should load
-    await expect(page.locator('[data-test="inventory-list"]')).toBeVisible();
+    await expect(page.locator(inventoryList)).toBeVisible();
   });
 
-  test('problem_user sees products but with visual rendering issues', async ({ inventoryPage, page }) => {
+  test('problem_user sees products but with visual rendering issues', async ({ page }) => {
     // ==================== ARRANGE ====================
-    // (inventoryPage fixture provides the authenticated session)
+    const { inventoryPage } = await loginAsProblemUser(page);
 
     // ==================== ACT ====================
     const itemCount = await inventoryPage.getItemCount();
@@ -57,8 +94,9 @@ test.describe('Problem User Variant @problem-user', () => {
     await expect(images).toHaveCount(6);
   });
 
-  test('problem_user can add items to cart despite cart calculation glitches', async ({ inventoryPage, page }) => {
+  test('problem_user can add items to cart despite cart calculation glitches', async ({ page }) => {
     // ==================== ARRANGE ====================
+    const { inventoryPage } = await loginAsProblemUser(page);
     const item = 'Sauce Labs Backpack';
 
     // ==================== ACT ====================
@@ -77,8 +115,9 @@ test.describe('Problem User Variant @problem-user', () => {
 
   // ─── Sorting behavior with glitches ───────────────────────────────────────
 
-  test('problem_user sorting still works despite render glitches', async ({ inventoryPage }) => {
+  test('problem_user sorting still works despite render glitches', async ({ page }) => {
     // ==================== ARRANGE ====================
+    const { inventoryPage } = await loginAsProblemUser(page);
     const originalNames = await inventoryPage.getItemNames();
 
     // ==================== ACT ====================
@@ -95,8 +134,9 @@ test.describe('Problem User Variant @problem-user', () => {
     expect(sortedNames).toEqual(manualSort);
   });
 
-  test('problem_user price sorting works despite data inconsistencies', async ({ inventoryPage }) => {
+  test('problem_user price sorting works despite data inconsistencies', async ({ page }) => {
     // ==================== ARRANGE ====================
+    const { inventoryPage } = await loginAsProblemUser(page);
     // Data might be inconsistent, but sorting should still work
 
     // ==================== ACT ====================
@@ -112,9 +152,18 @@ test.describe('Problem User Variant @problem-user', () => {
 
   // ─── Checkout flow with glitches ───────────────────────────────────────
 
-  test('problem_user can complete checkout despite visual glitches', async ({ checkoutPage, page }) => {
+  test('problem_user can complete checkout despite visual glitches', async ({ page }) => {
     // ==================== ARRANGE ====================
-    // Product in cart, on checkout step 1
+    const { inventoryPage } = await loginAsProblemUser(page);
+    const cartPage = new SauceDemoCartPage(page);
+    const checkoutPage = new SauceDemoCheckoutPage(page);
+
+    // Add item and navigate to checkout
+    await inventoryPage.addItemToCart('Sauce Labs Backpack');
+    await inventoryPage.goToCart();
+    await cartPage.proceedToCheckout();
+    await expect(page.locator('[data-test="firstName"]')).toBeVisible();
+
     const customerInfo = {
       firstName: 'Test',
       lastName: 'User',
@@ -139,9 +188,18 @@ test.describe('Problem User Variant @problem-user', () => {
     expect(await checkoutPage.isOrderComplete()).toBe(true);
   });
 
-  test('problem_user total calculation is correct despite UI glitches', async ({ checkoutPage }) => {
+  test('problem_user total calculation is correct despite UI glitches', async ({ page }) => {
     // ==================== ARRANGE ====================
-    // Navigate from checkout step 1 to step 2 (overview) where totals are displayed
+    const { inventoryPage } = await loginAsProblemUser(page);
+    const cartPage = new SauceDemoCartPage(page);
+    const checkoutPage = new SauceDemoCheckoutPage(page);
+
+    // Add item and navigate to checkout step 1
+    await inventoryPage.addItemToCart('Sauce Labs Backpack');
+    await inventoryPage.goToCart();
+    await cartPage.proceedToCheckout();
+    await expect(page.locator('[data-test="firstName"]')).toBeVisible();
+
     await checkoutPage.fillInfo({ firstName: 'Test', lastName: 'User', postalCode: '12345' });
     await checkoutPage.continueToOverview();
 
@@ -167,8 +225,9 @@ test.describe('Problem User Variant @problem-user', () => {
 
   // ─── Cart persistence with glitches ───────────────────────────────────────
 
-  test('problem_user cart persists correctly despite backend glitches', async ({ inventoryPage, page }) => {
+  test('problem_user cart persists correctly despite backend glitches', async ({ page }) => {
     // ==================== ARRANGE ====================
+    const { inventoryPage } = await loginAsProblemUser(page);
     const items = ['Sauce Labs Backpack', 'Sauce Labs Bike Light'];
 
     for (const item of items) {
@@ -193,8 +252,9 @@ test.describe('Problem User Variant @problem-user', () => {
 
   // ─── Multiple add/remove operations with inconsistencies ───────────────────
 
-  test('problem_user cart operations remain consistent despite glitches', async ({ inventoryPage, page }) => {
+  test('problem_user cart operations remain consistent despite glitches', async ({ page }) => {
     // ==================== ARRANGE ====================
+    const { inventoryPage } = await loginAsProblemUser(page);
     const item1 = 'Sauce Labs Backpack';
     const item2 = 'Sauce Labs Bike Light';
 
@@ -214,7 +274,7 @@ test.describe('Problem User Variant @problem-user', () => {
 
     // Verify correct item remains
     await inventoryPage.goToCart();
-    const cartNames = await page.locator('.cart_item_label').allTextContents();
+    const cartNames = await page.locator(cartItemLabel).allTextContents();
     expect(cartNames.join()).toContain('Sauce Labs Bike Light');
     expect(cartNames.join()).not.toContain('Sauce Labs Backpack');
   });
