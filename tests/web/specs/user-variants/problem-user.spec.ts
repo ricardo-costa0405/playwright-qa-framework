@@ -176,8 +176,11 @@ test.describe('Problem User Variant @problem-user', () => {
     // advance to checkout-step-two. The page stays on step one.
     await expect(page).toHaveURL(/checkout-step-one/);
 
-    // The form data is filled but navigation is blocked by the glitch
-    await expect(page.getByPlaceholder('First Name')).toHaveValue('Test');
+    // problem_user also has a form-field swap glitch: the first name
+    // input displays the last name value. Verify the glitch is present
+    // rather than asserting correct behavior that doesn't apply here.
+    await expect(page.getByPlaceholder('First Name')).toHaveValue('User');
+    await expect(page.getByPlaceholder('Last Name')).toHaveValue('User');
   });
 
   test('problem_user total calculation is blocked at checkout step one', async ({ page }) => {
