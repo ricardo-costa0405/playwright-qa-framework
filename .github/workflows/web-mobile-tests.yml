@@ -60,7 +60,7 @@ jobs:
           CI: 'true'
 
       - name: Upload JUnit results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: junit-results-web-mobile-${{ matrix.device }}
@@ -68,7 +68,7 @@ jobs:
           retention-days: 30
 
       - name: Upload HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: html-report-web-mobile-${{ matrix.device }}
@@ -76,7 +76,7 @@ jobs:
           retention-days: 30
 
       - name: Upload videos on failure
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: failure()
         with:
           name: videos-web-mobile-${{ matrix.device }}
