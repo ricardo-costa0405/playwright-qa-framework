@@ -52,6 +52,7 @@ jobs:
         run: npm run test:web -- --project=${{ matrix.browser }}
         env:
           CI: 'true'
+          PW_BROWSER: ${{ matrix.browser }}
 
       - name: Upload JUnit results
         uses: actions/upload-artifact@v5
