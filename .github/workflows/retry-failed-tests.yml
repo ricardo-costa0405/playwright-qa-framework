@@ -1,0 +1,117 @@
+name: 'Retry Failed Tests'
+
+on:
+  workflow_run:
+    workflows:
+      - 'Web Tests - Playwright'
+      - 'Web Mobile Tests - Playwright'
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID to retry failed jobs for'
+        required: true
+        type: number
+
+permissions:
+  actions: write
+  checks: write
+  contents: write
+
+jobs:
+  retry-failed:
+    name: 'Retry failed jobs'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine failed jobs (auto-trigger)
+        if: github.event_name == 'workflow_run'
+        id: failed-jobs-auto
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const runId = context.payload.workflow_run.id;
+            const attempt = context.payload.workflow_run.run_attempt;
+
+            if (attempt >= 2) {
+              core.info('Already retried once — skipping.');
+              core.setOutput('has_failures', 'false');
+              return;
+            }
+
+            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRunAttempt({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+              attempt_number: attempt,
+            });
+
+            const failedJobs = jobs.jobs
+              .filter(j => j.conclusion === 'failure')
+              .map(j => j.name);
+
+            if (failedJobs.length === 0) {
+              core.info('No failed jobs found — skipping retry.');
+              core.setOutput('has_failures', 'false');
+              return;
+            }
+
+            core.info(`Failed jobs: ${failedJobs.join(', ')}`);
+            core.setOutput('has_failures', 'true');
+            core.setOutput('failed_jobs', JSON.stringify(failedJobs));
+            core.setOutput('run_id', String(runId));
+
+      - name: Re-run failed jobs (auto-trigger)
+        if: github.event_name == 'workflow_run' && steps.failed-jobs-auto.outputs.has_failures == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const runId = context.payload.workflow_run.id;
+            await github.rest.actions.reRunWorkflowFailedJobs({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+            core.info(`Re-triggered failed jobs for run #${runId}.`);
+
+      - name: Re-run failed jobs (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const runId = ${{ inputs.run_id }};
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+
+            if (run.conclusion !== 'failure') {
+              core.setFailed(`Run #${runId} did not fail (conclusion: ${run.conclusion}). Aborting.`);
+              return;
+            }
+
+            await github.rest.actions.reRunWorkflowFailedJobs({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+            core.info(`Manually re-triggered failed jobs for run #${runId}.`);
+
+      - name: Write summary
+        if: github.event_name == 'workflow_run' && steps.failed-jobs-auto.outputs.has_failures == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const runId = context.payload.workflow_run.id;
+            const runUrl = context.payload.workflow_run.html_url;
+            const workflowName = context.payload.workflow_run.name;
+            const failedJobs = JSON.parse(steps['failed-jobs-auto'].outputs.failed_jobs || '[]');
+
+            await core.summary
+              .addHeading('🔄 Retry Triggered')
+              .addRaw(`Workflow **${workflowName}** (run [#${runId}](${runUrl})) failed.`)
+              .addRaw('Re-running only the failed jobs:')
+              .addList(failedJobs)
+              .write();
