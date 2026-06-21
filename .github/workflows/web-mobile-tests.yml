@@ -58,6 +58,7 @@ jobs:
         run: npm run test:web-mobile -- --project="${{ matrix.device }}"
         env:
           CI: 'true'
+          PW_BROWSER: ${{ matrix.browser }}
 
       - name: Upload JUnit results
         uses: actions/upload-artifact@v5
