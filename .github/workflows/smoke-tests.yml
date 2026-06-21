@@ -42,11 +42,8 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-            npx playwright install-deps chromium
-          else
-            npx playwright install --with-deps chromium
-          fi
+          npx playwright install-deps chromium
+          npx playwright install chromium
 
       - name: Run smoke tests
         run: npm run test:smoke -- --project=chromium --workers=4
