@@ -19,15 +19,15 @@ import * as fs from 'fs';
 const AUTH_DIR  = path.resolve(import.meta.dirname ?? __dirname, '.auth');
 const AUTH_FILE = path.join(AUTH_DIR, 'standard_user.json');
 
-function launchBrowser(browserName: string): Browser {
+async function launchBrowser(browserName: string): Promise<Browser> {
   switch (browserName) {
     case 'firefox':
-      return firefox.launch();
+      return await firefox.launch();
     case 'webkit':
-      return webkit.launch();
+      return await webkit.launch();
     case 'chromium':
     default:
-      return chromium.launch();
+      return await chromium.launch();
   }
 }
 
