@@ -89,6 +89,18 @@ export class SauceDemoInventoryPage extends BasePage {
     await expect(this.sortDropdown).toHaveValue(option);
   }
 
+  /**
+   * Sort for problem_user which has a known glitch: the dropdown selection
+   * reverts to default ("az") immediately after selecting a different option.
+   * This method selects the option and then asserts the revert happened.
+   */
+  async sortByExpectingGlitch(option: SortOption): Promise<void> {
+    await expect(this.sortDropdown).toBeVisible();
+    await this.sortDropdown.selectOption(option);
+    // problem_user glitch: value reverts to "az"
+    await expect(this.sortDropdown).toHaveValue('az');
+  }
+
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   async goToCart(): Promise<void> {

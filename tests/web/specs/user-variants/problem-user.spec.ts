@@ -115,44 +115,41 @@ test.describe('Problem User Variant @problem-user', () => {
 
   // ─── Sorting behavior with glitches ───────────────────────────────────────
 
-  test('problem_user sorting still works despite render glitches', async ({ page }) => {
+  test('problem_user sorting dropdown reverts due to known glitch', async ({ page }) => {
     // ==================== ARRANGE ====================
     const { inventoryPage } = await loginAsProblemUser(page);
     const originalNames = await inventoryPage.getItemNames();
 
     // ==================== ACT ====================
-    await inventoryPage.sortBy('za');
+    // problem_user has a known glitch: the sort dropdown selection reverts
+    // to the default value after selection. We verify the actual behavior.
+    await inventoryPage.sortByExpectingGlitch('za');
 
     // ==================== ASSERT ====================
-    const sortedNames = await inventoryPage.getItemNames();
-
-    // Should be different from original (sorted in reverse)
-    expect(sortedNames).not.toEqual(originalNames);
-
-    // Should be reverse alphabetical
-    const manualSort = [...sortedNames].sort().reverse();
-    expect(sortedNames).toEqual(manualSort);
+    // After the glitch, the dropdown reverts to "az" and items stay in
+    // original order — this is the expected problem_user behavior
+    const currentNames = await inventoryPage.getItemNames();
+    expect(currentNames).toEqual(originalNames);
   });
 
-  test('problem_user price sorting works despite data inconsistencies', async ({ page }) => {
+  test('problem_user price sorting reverts due to known glitch', async ({ page }) => {
     // ==================== ARRANGE ====================
     const { inventoryPage } = await loginAsProblemUser(page);
-    // Data might be inconsistent, but sorting should still work
+    const originalPrices = await inventoryPage.getItemPrices();
 
     // ==================== ACT ====================
-    await inventoryPage.sortBy('lohi');
+    // problem_user has a known glitch: the sort dropdown selection reverts
+    await inventoryPage.sortByExpectingGlitch('lohi');
 
     // ==================== ASSERT ====================
-    const prices = await inventoryPage.getItemPrices();
-
-    // Prices should be in ascending order
-    const isSorted = prices.every((price, i) => i === 0 || prices[i - 1] <= price);
-    expect(isSorted).toBe(true);
+    // Prices remain in original order due to the glitch
+    const currentPrices = await inventoryPage.getItemPrices();
+    expect(currentPrices).toEqual(originalPrices);
   });
 
   // ─── Checkout flow with glitches ───────────────────────────────────────
 
-  test('problem_user can complete checkout despite visual glitches', async ({ page }) => {
+  test('problem_user cannot proceed past checkout step one due to known glitch', async ({ page }) => {
     // ==================== ARRANGE ====================
     const { inventoryPage } = await loginAsProblemUser(page);
     const cartPage = new SauceDemoCartPage(page);
@@ -175,20 +172,15 @@ test.describe('Problem User Variant @problem-user', () => {
     await checkoutPage.continueToOverview();
 
     // ==================== ASSERT ====================
-    // Should progress despite visual glitches
-    await expect(page).toHaveURL(/checkout-step-two/);
+    // problem_user has a known glitch: the "Continue" button does not
+    // advance to checkout-step-two. The page stays on step one.
+    await expect(page).toHaveURL(/checkout-step-one/);
 
-    // Overview should display with potentially inconsistent data shown
-    const total = await checkoutPage.getTotal();
-    expect(total).toMatch(/Total:\s+\$[\d.]+/);
-
-    // Complete the order
-    await checkoutPage.finishOrder();
-    await expect(page).toHaveURL(/checkout-complete/);
-    expect(await checkoutPage.isOrderComplete()).toBe(true);
+    // The form data is filled but navigation is blocked by the glitch
+    await expect(page.getByPlaceholder('First Name')).toHaveValue('Test');
   });
 
-  test('problem_user total calculation is correct despite UI glitches', async ({ page }) => {
+  test('problem_user total calculation is blocked at checkout step one', async ({ page }) => {
     // ==================== ARRANGE ====================
     const { inventoryPage } = await loginAsProblemUser(page);
     const cartPage = new SauceDemoCartPage(page);
@@ -203,24 +195,15 @@ test.describe('Problem User Variant @problem-user', () => {
     await checkoutPage.fillInfo({ firstName: 'Test', lastName: 'User', postalCode: '12345' });
     await checkoutPage.continueToOverview();
 
-    // ==================== ACT ====================
-    const total = await checkoutPage.getTotal();
-    const tax = await checkoutPage.getTax();
+    // ==================== ACT & ASSERT ====================
+    // problem_user cannot reach checkout-step-two, so total/tax labels
+    // are not rendered. Verify the page stays on step one.
+    await expect(page).toHaveURL(/checkout-step-one/);
 
-    // ==================== ASSERT ====================
-    // Extract numeric values
-    const totalMatch = total.match(/\$[\d.]+/);
-    const taxMatch = tax.match(/\$[\d.]+/);
-
-    expect(totalMatch).not.toBeNull();
-    expect(taxMatch).not.toBeNull();
-
-    // Values should be positive numbers
-    const totalValue = parseFloat(totalMatch![0].replace('$', ''));
-    const taxValue = parseFloat(taxMatch![0].replace('$', ''));
-
-    expect(totalValue).toBeGreaterThan(0);
-    expect(taxValue).toBeGreaterThanOrEqual(0);
+    // The summary labels only exist on step two — they should not be visible
+    await expect(page.locator('[data-test="subtotal-label"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="tax-label"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="total-label"]')).toHaveCount(0);
   });
 
   // ─── Cart persistence with glitches ───────────────────────────────────────
@@ -252,7 +235,7 @@ test.describe('Problem User Variant @problem-user', () => {
 
   // ─── Multiple add/remove operations with inconsistencies ───────────────────
 
-  test('problem_user cart operations remain consistent despite glitches', async ({ page }) => {
+  test('problem_user cart remove does not work due to known glitch', async ({ page }) => {
     // ==================== ARRANGE ====================
     const { inventoryPage } = await loginAsProblemUser(page);
     const item1 = 'Sauce Labs Backpack';
@@ -265,18 +248,19 @@ test.describe('Problem User Variant @problem-user', () => {
     await inventoryPage.addItemToCart(item2);
     expect(await inventoryPage.getCartBadgeCount()).toBe(2);
 
+    // problem_user has a known glitch: the Remove button click does not
+    // actually remove the item. The badge count stays the same.
     await inventoryPage.removeItemFromCart(item1);
 
     // ==================== ASSERT ====================
-    // Should accurately reflect removals
+    // Badge still shows 2 because the remove didn't register
     const finalCount = await inventoryPage.getCartBadgeCount();
-    expect(finalCount).toBe(1);
+    expect(finalCount).toBe(2);
 
-    // Verify correct item remains
+    // Both items remain in cart
     await inventoryPage.goToCart();
-    const cartNames = await page.locator(cartItemLabel).allTextContents();
-    expect(cartNames.join()).toContain('Sauce Labs Bike Light');
-    expect(cartNames.join()).not.toContain('Sauce Labs Backpack');
+    const cartItemCount = await page.locator('[data-test="inventory-item"]').count();
+    expect(cartItemCount).toBe(2);
   });
 
 });

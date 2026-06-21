@@ -41,13 +41,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ matrix.browser }}-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install-deps ${{ matrix.browser }}
+
       - name: Install Playwright browsers
-        run: |
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-            npx playwright install-deps ${{ matrix.browser }}
-          else
-            npx playwright install --with-deps ${{ matrix.browser }}
-          fi
+        run: npx playwright install ${{ matrix.browser }}
 
       - name: Run web tests - ${{ matrix.browser }}
         run: npm run test:web -- --project=${{ matrix.browser }}
