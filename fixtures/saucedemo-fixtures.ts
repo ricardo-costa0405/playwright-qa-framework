@@ -12,11 +12,15 @@ import { SauceDemoCheckoutPage } from '../pages/saucedemo/SauceDemoCheckoutPage'
 //  locked_out_user        → blocked at login — tests error state
 //  problem_user           → logged in but with broken images / wrong names
 //  performance_glitch_user → logged in but artificially slow (>5 s)
+//  visual_user             → logged in but all product images are identical (swapped)
+//  error_user              → logged in but form fields show incorrect error states
 export const SAUCE_CREDENTIALS = {
   standard: { username: 'standard_user',           password: 'secret_sauce' },
   locked:   { username: 'locked_out_user',          password: 'secret_sauce' },
   problem:  { username: 'problem_user',             password: 'secret_sauce' },
   glitch:   { username: 'performance_glitch_user',  password: 'secret_sauce' },
+  visual:   { username: 'visual_user',              password: 'secret_sauce' },
+  error:    { username: 'error_user',               password: 'secret_sauce' },
 } as const;
 
 // ─── Session validation helper ──────────────────────────────────────────────
