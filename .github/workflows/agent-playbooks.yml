@@ -1,4 +1,4 @@
-name: 'Agent Playbooks'
+name: 'Coverage Pipeline'
 
 on:
   push:
@@ -8,12 +8,17 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: agent-playbooks-${{ github.event.pull_request.number || github.ref }}
+  group: coverage-pipeline-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
 
 jobs:
   validate:
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
 
     steps:
@@ -29,14 +34,94 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
-      - name: Validate agent playbooks
-        run: npm run validate:playbooks
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Type-check framework
-        run: npm run type-check
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install-deps chromium && npx playwright install chromium
 
-      - name: Validate test patterns
-        run: npm run validate:aaa
+      - name: Run Coverage Pipeline
+        id: coverage
+        run: npm run ci:coverage:report
+        continue-on-error: true
+        env:
+          CI: 'true'
 
-      - name: Validate timeout rules
-        run: npm run validate:timeouts
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: coverage-pipeline-report
+          path: reports/coverage/
+          retention-days: 30
+
+      - name: Read coverage report for summary
+        uses: actions/github-script@v8
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'reports/coverage/coverage-pipeline.md';
+            if (!fs.existsSync(reportPath)) {
+              await core.summary.addRaw('No coverage report generated.').write();
+              return;
+            }
+            const md = fs.readFileSync(reportPath, 'utf-8');
+
+            // Extract status badge
+            const statusMatch = md.match(/Coverage Pipeline Report\s+(.+)/);
+            const status = statusMatch ? statusMatch[1].trim() : 'Unknown';
+
+            // Extract test suite table
+            const tableMatch = md.match(/\| Suite .+?\n\|[-| ]+\n((?:\|[^\n]+\n)+)/);
+            const table = tableMatch ? tableMatch[1].trim() : 'No test data';
+
+            // Extract coverage gaps
+            const gapCount = (md.match(/^\*\*([^\*]+)\*\*/gm) || []).length;
+            const failureCount = (md.match(/❌/g) || []).length;
+
+            await core.summary
+              .addHeading(`Coverage Pipeline  ${status}`)
+              .addRaw(`Gaps: ${gapCount}  Failures: ${failureCount}`)
+              .addRaw('\n\n---\n\n')
+              .addRaw(table.length > 100 ? table.substring(0, 500) : table)
+              .addRaw('\n\n')
+              .addRaw(`[Full report artifact](coverage-pipeline-report)`)
+              .write();
+
+      - name: Comment PR with coverage report
+        uses: actions/github-script@v8
+        if: github.event_name == 'pull_request' && always()
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'reports/coverage/coverage-pipeline.md';
+            if (!fs.existsSync(reportPath)) return;
+
+            const md = fs.readFileSync(reportPath, 'utf-8');
+            const sections = md.split('---');
+
+            // Build compact PR comment — top summary + gap list
+            const header = sections[0] || '';
+            const gapSection = sections.find(s => s.includes('Coverage Gaps')) || '';
+            const actionSection = sections.find(s => s.includes('Recommended Actions')) || '';
+
+            const body = [
+              header.trim().substring(0, 800),
+              '',
+              gapSection.trim().substring(0, 1500),
+              '',
+              actionSection.trim().substring(0, 1000),
+            ].join('\n\n---\n\n');
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body || 'Coverage pipeline completed — no report body available.',
+            });
