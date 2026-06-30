@@ -85,7 +85,7 @@ test.describe('Problem User Variant @problem-user', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.context().clearCookies();
-    await page.evaluate(() => {
+    await page.context().addInitScript(() => {
       localStorage.clear();
       sessionStorage.clear();
     });
