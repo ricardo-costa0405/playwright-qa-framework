@@ -90,7 +90,7 @@ test.describe('Performance Glitch User Variant @performance-user', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.context().clearCookies();
-    await page.evaluate(() => {
+    await page.context().addInitScript(() => {
       localStorage.clear();
       sessionStorage.clear();
     });
