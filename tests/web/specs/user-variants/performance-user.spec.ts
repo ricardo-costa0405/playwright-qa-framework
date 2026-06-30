@@ -88,14 +88,6 @@ test.describe('Performance Glitch User Variant @performance-user', () => {
     ).toBe(expectedUser);
   }
 
-  test.beforeEach(async ({ page }) => {
-    await page.context().clearCookies();
-    await page.context().addInitScript(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
-  });
-
   // ─── Login performance ────────────────────────────────────────────────────
 
   test('performance_user login completes despite 3s+ server delays', async ({ page }) => {

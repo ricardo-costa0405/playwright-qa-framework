@@ -89,14 +89,6 @@ async function assertSessionUser(page: Page, expectedUser: string): Promise<void
 
 test.describe('Error User Variant @error-user', () => {
 
-  test.beforeEach(async ({ page }) => {
-    await page.context().clearCookies();
-    await page.context().addInitScript(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
-  });
-
   // ─── Login ─────────────────────────────────────────────────────────────────
 
   test('error_user logs in successfully with standard credentials', async ({ page }) => {
