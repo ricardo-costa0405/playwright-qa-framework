@@ -54,7 +54,7 @@ export default defineConfig({
 
   use: {
     baseURL:          BASE_URL,
-    storageState:     '.auth/standard_user.json',
+    storageState:     '.auth/standard_user-chromium.json',   // overridden per project below
     trace:            TRACE_MODE as 'on' | 'off' | 'retain-on-failure' | 'on-first-retry',
     screenshot:       'only-on-failure',
     actionTimeout:    0,   // rely on Playwright auto-waiting
@@ -79,6 +79,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport:    { width: 1920, height: 1080 },
         launchOptions: { args: ['--disable-dev-shm-usage'] },
+        storageState: '.auth/standard_user-chromium.json',
       },
       outputDir: `${SCREENCAST_DIR}/chromium`,
     },
@@ -88,6 +89,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Firefox'],
         viewport: { width: 1920, height: 1080 },
+        storageState: '.auth/standard_user-firefox.json',
       },
       outputDir: `${SCREENCAST_DIR}/firefox`,
     },
@@ -97,6 +99,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Safari'],
         viewport: { width: 1920, height: 1080 },
+        storageState: '.auth/standard_user-webkit.json',
       },
       outputDir: `${SCREENCAST_DIR}/webkit`,
     },
@@ -107,6 +110,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport:    { width: 1366, height: 768 },
         launchOptions: { args: ['--disable-dev-shm-usage'] },
+        storageState: '.auth/standard_user-chromium.json',
       },
       outputDir: `${SCREENCAST_DIR}/chromium-1366`,
     },

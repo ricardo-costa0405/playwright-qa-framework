@@ -39,7 +39,7 @@ export default defineConfig({
 
   use: {
     baseURL:           BASE_URL,
-    storageState:      '.auth/standard_user.json',
+    storageState:      '.auth/standard_user-chromium.json',   // overridden per project below
     trace:             TRACE_MODE as 'on' | 'off' | 'retain-on-failure' | 'on-first-retry',
     screenshot:        'only-on-failure',
     video: {
@@ -62,15 +62,15 @@ export default defineConfig({
   projects: [
     {
       name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
+      use: { ...devices['Pixel 5'], storageState: '.auth/standard_user-chromium.json' },
     },
     {
       name: 'Mobile Safari',
-      use: { ...devices['iPhone 13 Pro'] },
+      use: { ...devices['iPhone 13 Pro'], storageState: '.auth/standard_user-webkit.json' },
     },
     {
       name: 'Galaxy S24',
-      use: { ...devices['Galaxy S24'] },
+      use: { ...devices['Galaxy S24'], storageState: '.auth/standard_user-chromium.json' },
     },
   ],
 });
