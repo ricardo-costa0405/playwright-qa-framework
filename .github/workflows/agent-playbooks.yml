@@ -11,10 +11,20 @@ concurrency:
   group: agent-playbooks-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   validate:
     timeout-minutes: 10
     runs-on: ubuntu-latest
+
+    outputs:
+      playbooks_status: ${{ steps.playbooks.outcome }}
+      typecheck_status: ${{ steps.typecheck.outcome }}
+      aaa_status: ${{ steps.aaa.outcome }}
+      timeouts_status: ${{ steps.timeouts.outcome }}
 
     steps:
       - name: Checkout code
@@ -30,13 +40,128 @@ jobs:
         run: npm ci --prefer-offline --no-audit
 
       - name: Validate agent playbooks
-        run: npm run validate:playbooks
+        id: playbooks
+        continue-on-error: true
+        run: npm run validate:playbooks 2>&1 | tee /tmp/val-playbooks.log
 
       - name: Type-check framework
-        run: npm run type-check
+        id: typecheck
+        continue-on-error: true
+        run: npm run type-check 2>&1 | tee /tmp/val-typecheck.log
 
       - name: Validate test patterns
-        run: npm run validate:aaa
+        id: aaa
+        continue-on-error: true
+        run: npm run validate:aaa 2>&1 | tee /tmp/val-aaa.log
 
       - name: Validate timeout rules
-        run: npm run validate:timeouts
+        id: timeouts
+        continue-on-error: true
+        run: npm run validate:timeouts 2>&1 | tee /tmp/val-timeouts.log
+
+      - name: Capture validation logs
+        if: always()
+        run: |
+          for f in /tmp/val-*.log; do
+            echo "=== $(basename $f .log) ==="
+            cat "$f"
+            echo "---"
+          done > /tmp/validation-summary.txt
+
+      - name: Upload validation logs
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: validation-logs
+          path: /tmp/val-*.log
+          retention-days: 7
+
+      - name: Comment PR with validation results
+        uses: actions/github-script@v8
+        if: github.event_name == 'pull_request' && always()
+        with:
+          script: |
+            const fs = require('fs');
+
+            const steps = [
+              { id: 'playbooks',  label: 'Validate Playbooks',     symbol: '📜' },
+              { id: 'typecheck',  label: 'Type-check Framework',   symbol: '🔍' },
+              { id: 'aaa',        label: 'Validate Test Patterns', symbol: '🧩' },
+              { id: 'timeouts',   label: 'Validate Timeout Rules', symbol: '⏱️' },
+            ];
+
+            const outcomes = {
+              playbooks:  '${{ steps.playbooks.outcome }}',
+              typecheck:  '${{ steps.typecheck.outcome }}',
+              aaa:        '${{ steps.aaa.outcome }}',
+              timeouts:   '${{ steps.timeouts.outcome }}',
+            };
+
+            const allPassed = Object.values(outcomes).every(v => v === 'success' || v === 'skipped');
+
+            const rows = steps.map(s => {
+              const result = outcomes[s.id];
+              const icon = result === 'success' ? '✅' : result === 'skipped' ? '⏭️' : '❌';
+              return `| ${s.symbol} ${s.label} | ${icon} \`${result}\` |`;
+            }).join('\n');
+
+            // Read log snippets for failures
+            let failureDetails = '';
+            const failed = steps.filter(s => outcomes[s.id] === 'failure');
+            if (failed.length > 0) {
+              const sections = failed.map(s => {
+                const logPath = `/tmp/val-${s.id}.log`;
+                let logContent = '(no log captured)';
+                if (fs.existsSync(logPath)) {
+                  const raw = fs.readFileSync(logPath, 'utf8').trim();
+                  logContent = raw.slice(0, 1500) + (raw.length > 1500 ? '\n... _(truncated)_' : '');
+                }
+                return [
+                  `<details>`,
+                  `<summary>❌ ${s.label}</summary>`,
+                  '',
+                  '```',
+                  logContent,
+                  '```',
+                  '</details>',
+                ].join('\n');
+              });
+              failureDetails = sections.join('\n\n');
+            }
+
+            const runLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const body = [
+              `## 📋 Agent Playbook Validations  ${allPassed ? '✅' : '❌'}`,
+              '',
+              '| Validation | Result |',
+              '|------------|--------|',
+              rows,
+              '',
+              `| **🔗 Workflow** | [Run #${context.runId}](${runLink}) |`,
+              '',
+              failureDetails,
+              '',
+              allPassed
+                ? '✅ All validations passed — playbooks are healthy.'
+                : '❌ One or more validations failed. Check the logs above for details.',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+      - name: Fail job if any validation failed
+        if: always()
+        run: |
+          outcomes='${{ steps.playbooks.outcome }} ${{ steps.typecheck.outcome }} ${{ steps.aaa.outcome }} ${{ steps.timeouts.outcome }}'
+          for o in $outcomes; do
+            if [ "$o" = "failure" ]; then
+              echo "❌ One or more validations failed"
+              exit 1
+            fi
+          done
+          echo "✅ All validations passed"

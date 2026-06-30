@@ -66,7 +66,15 @@ jobs:
           script: |
             const fs = require('fs');
             const xmlPath = 'reports/junit/web-results.xml';
-            if (!fs.existsSync(xmlPath)) return;
+            if (!fs.existsSync(xmlPath)) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: 'No JUnit report found — tests may not have produced output.',
+              });
+              return;
+            }
 
             const xml = fs.readFileSync(xmlPath, 'utf8');
 
@@ -84,29 +92,92 @@ jobs:
             const duration = parseFloat(attr('time'))       || 0;
             const passed   = total - failures - errors - skipped;
 
-            // Per-test durations for performance metrics
-            const times = [...xml.matchAll(/<testcase\b[^>]*\btime="([\d.]+)"/g)]
-              .map(m => parseFloat(m[1]))
-              .filter(t => t > 0);
+            // Per-test durations
+            const testCases = [...xml.matchAll(/<testcase\s+([^>]*)>/g)].map(m => {
+              const nameAttr = m[1].match(/name="([^"]+)"/);
+              const timeAttr = m[1].match(/time="([\d.]+)"/);
+              // Check if this testcase contains a failure element
+              const idx = m.index;
+              const endIdx = xml.indexOf('</testcase>', idx);
+              const block = xml.slice(idx, endIdx + 11);
+              const hasFailure = /<(failure|error)\b/i.test(block);
+              const failureMsg = block.match(/<(failure|error)\b[^>]*>([^<]*)/);
+              return {
+                name: nameAttr ? nameAttr[1] : 'unknown',
+                time: timeAttr ? parseFloat(timeAttr[1]) : 0,
+                failed: hasFailure,
+                failureDetail: failureMsg ? failureMsg[2]?.trim() : null,
+              };
+            });
+
+            const times = testCases.map(t => t.time).filter(t => t > 0);
             const avg = times.length
               ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(2)
               : '0.00';
             const max = times.length ? Math.max(...times).toFixed(2) : '0.00';
 
-            const badge = failures + errors === 0 ? '[PASS]' : '[FAIL]';
+            const allPassed = failures + errors === 0;
+            const statusEmoji = allPassed ? '✅' : '❌';
+            const statusLabel = allPassed ? 'PASS' : 'FAIL';
+
+            // Failure details collapsible section
+            const failedTests = testCases.filter(t => t.failed);
+            let failureDetails = '';
+            if (failedTests.length > 0) {
+              const lines = failedTests.map(t =>
+                `| \`${t.name}\` | ${t.failureDetail || 'No detail'} |`
+              );
+              failureDetails = [
+                '<details>',
+                `<summary>❌ Failed tests (${failedTests.length})</summary>`,
+                '',
+                '| Test | Error |',
+                '|------|-------|',
+                ...lines,
+                '</details>',
+                '',
+              ].join('\n');
+            }
+
+            // Slow test outliers (2x+ average, > 5s)
+            const slowThreshold = Math.max(parseFloat(avg) * 2, 5);
+            const slowTests = testCases.filter(t => t.time > slowThreshold && !t.failed);
+            let slowSection = '';
+            if (slowTests.length > 0) {
+              const lines = slowTests.map(t =>
+                `| \`${t.name}\` | ${t.time.toFixed(2)}s |`
+              );
+              slowSection = [
+                '<details>',
+                `<summary>🐢 Slow tests (>&nbsp;${slowThreshold.toFixed(1)}s) — ${slowTests.length}</summary>`,
+                '',
+                '| Test | Duration |',
+                '|------|----------|',
+                ...lines,
+                '</details>',
+                '',
+              ].join('\n');
+            }
+
+            const runLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
             const body = [
-              `### Smoke Test Results  ${badge}`,
+              `## 🧪 Smoke Tests  ${statusEmoji}`,
               '',
-              '| Metric     | Value |',
-              '|------------|-------|',
-              `| Status     | ${badge} |`,
-              `| Passed     | ${passed} / ${total} |`,
-              `| Failed     | ${failures + errors} |`,
-              `| Skipped    | ${skipped} |`,
-              `| Duration   | ${duration.toFixed(2)}s |`,
-              `| Avg / test | ${avg}s |`,
-              `| Max / test | ${max}s |`,
+              `| Metric         | Value |`,
+              `|----------------|-------|`,
+              `| **Status**     | ${statusEmoji} **${statusLabel}** |`,
+              `| ✅ Passed      | ${passed} / ${total} |`,
+              `| ❌ Failed      | ${failures + errors} |`,
+              `| ⏭️ Skipped     | ${skipped} |`,
+              `| ⏱ Duration     | ${duration.toFixed(2)}s |`,
+              `| 📊 Avg / test  | ${avg}s |`,
+              `| 📈 Max / test  | ${max}s |`,
+              `| 🔗 Workflow    | [Run #${context.runId}](${runLink}) |`,
+              '',
+              failureDetails,
+              slowSection,
+              `_Report generated from ${xmlPath}_`,
             ].join('\n');
 
             await github.rest.issues.createComment({
