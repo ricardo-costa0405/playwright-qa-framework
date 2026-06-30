@@ -16,8 +16,7 @@ on:
 
 permissions:
   actions: write
-  checks: write
-  contents: write
+  contents: read
 
 jobs:
   retry-failed:
@@ -25,93 +24,126 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Determine failed jobs (auto-trigger)
+      - name: Determine and retry failed jobs (auto-trigger)
         if: github.event_name == 'workflow_run'
-        id: failed-jobs-auto
         uses: actions/github-script@v8
+        env:
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
         with:
           script: |
-            const runId = context.payload.workflow_run.id;
-            const attempt = context.payload.workflow_run.run_attempt;
+            const workflowName = process.env.WORKFLOW_NAME;
+            const runId = parseInt(process.env.RUN_ID);
+            const attempt = parseInt(process.env.RUN_ATTEMPT);
+            const conclusion = process.env.RUN_CONCLUSION;
+            const runUrl = process.env.RUN_URL;
 
-            if (attempt >= 2) {
-              core.info('Already retried once — skipping.');
-              core.setOutput('has_failures', 'false');
+            core.info(`Source workflow: "${workflowName}"`);
+            core.info(`Run ID: ${runId}, attempt: ${attempt}, conclusion: "${conclusion}"`);
+
+            // Guard: only retry failures
+            if (conclusion !== 'failure') {
+              core.info(`Skipping: conclusion is "${conclusion}" — not a failure.`);
               return;
             }
 
-            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRunAttempt({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: runId,
-              attempt_number: attempt,
-            });
+            // Guard: one retry max per run
+            if (attempt >= 2) {
+              core.info(`Skipping: run attempt ${attempt} — already retried once.`);
+              return;
+            }
 
-            const failedJobs = jobs.jobs
+            // Paginate through ALL jobs (handles workflows with 30+ jobs)
+            const allJobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRunAttempt,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId,
+                attempt_number: attempt,
+              }
+            );
+
+            const failedJobs = allJobs
               .filter(j => j.conclusion === 'failure')
               .map(j => j.name);
 
             if (failedJobs.length === 0) {
               core.info('No failed jobs found — skipping retry.');
-              core.setOutput('has_failures', 'false');
               return;
             }
 
-            core.info(`Failed jobs: ${failedJobs.join(', ')}`);
-            core.setOutput('has_failures', 'true');
-            core.setOutput('failed_jobs', JSON.stringify(failedJobs));
-            core.setOutput('run_id', String(runId));
+            core.info(`Failed jobs (${failedJobs.length}): ${failedJobs.join(', ')}`);
 
-      - name: Re-run failed jobs (auto-trigger)
-        if: github.event_name == 'workflow_run' && steps.failed-jobs-auto.outputs.has_failures == 'true'
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const runId = context.payload.workflow_run.id;
             await github.rest.actions.reRunWorkflowFailedJobs({
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id: runId,
             });
+
             core.info(`Re-triggered failed jobs for run #${runId}.`);
 
-      - name: Re-run failed jobs (manual trigger)
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const runId = ${{ inputs.run_id }};
-            const { data: run } = await github.rest.actions.getWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: runId,
-            });
-
-            if (run.conclusion !== 'failure') {
-              core.setFailed(`Run #${runId} did not fail (conclusion: ${run.conclusion}). Aborting.`);
-              return;
-            }
-
-            await github.rest.actions.reRunWorkflowFailedJobs({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: runId,
-            });
-            core.info(`Manually re-triggered failed jobs for run #${runId}.`);
-
-      - name: Write summary
-        if: github.event_name == 'workflow_run' && steps.failed-jobs-auto.outputs.has_failures == 'true'
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const runId = context.payload.workflow_run.id;
-            const runUrl = context.payload.workflow_run.html_url;
-            const workflowName = context.payload.workflow_run.name;
-            const failedJobs = JSON.parse(steps['failed-jobs-auto'].outputs.failed_jobs || '[]');
-
             await core.summary
-              .addHeading('🔄 Retry Triggered')
+              .addHeading('🔄 Auto Retry Triggered')
               .addRaw(`Workflow **${workflowName}** (run [#${runId}](${runUrl})) failed.`)
               .addRaw('Re-running only the failed jobs:')
               .addList(failedJobs)
+              .write();
+
+      - name: Retry failed jobs (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v8
+        env:
+          RUN_ID: ${{ github.event.inputs.run_id }}
+        with:
+          script: |
+            const allowedWorkflows = ['Web Tests - Playwright', 'Web Mobile Tests - Playwright'];
+            const rawRunId = process.env.RUN_ID;
+            const runId = parseInt(rawRunId);
+
+            if (!rawRunId || isNaN(runId)) {
+              core.setFailed('Invalid or missing run_id input.');
+              return;
+            }
+
+            let run;
+            try {
+              const resp = await github.rest.actions.getWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId,
+              });
+              run = resp.data;
+            } catch (err) {
+              core.setFailed(`Could not fetch run #${runId}: ${err.message}`);
+              return;
+            }
+
+            core.info(`Target workflow: "${run.name}", run #${runId}, conclusion: "${run.conclusion}", attempt: ${run.run_attempt}`);
+
+            if (!allowedWorkflows.includes(run.name)) {
+              core.setFailed(`Workflow "${run.name}" is not in the allowed list: ${allowedWorkflows.join(', ')}`);
+              return;
+            }
+
+            if (run.conclusion !== 'failure') {
+              core.setFailed(`Run #${runId} did not fail (conclusion: "${run.conclusion}"). Aborting.`);
+              return;
+            }
+
+            await github.rest.actions.reRunWorkflowFailedJobs({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+
+            core.info(`Manually re-triggered failed jobs for run #${runId}.`);
+
+            await core.summary
+              .addHeading('🔄 Manual Retry Triggered')
+              .addRaw(`Workflow **${run.name}** (run [#${runId}](${run.html_url})) failed.`)
+              .addRaw('Re-running only the failed jobs:')
               .write();
