@@ -49,6 +49,7 @@ jobs:
         run: npm run test:smoke -- --project=chromium --workers=4
         env:
           CI: 'true'
+          PW_BROWSER: 'chromium'
 
       - name: Upload results
         uses: actions/upload-artifact@v5
