@@ -60,7 +60,8 @@ test.describe('Performance Glitch User Variant @performance-user', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.context().clearCookies();
-    await page.evaluate(() => {
+    // Context-level storage clearing — avoids SecurityError from page.evaluate
+    await page.context().addInitScript(() => {
       localStorage.clear();
       sessionStorage.clear();
     });

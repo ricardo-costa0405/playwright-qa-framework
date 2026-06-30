@@ -134,6 +134,23 @@ jobs:
               return;
             }
 
+            // Fetch failed jobs for logging and summary
+            const allJobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRunAttempt,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId,
+                attempt_number: run.run_attempt,
+              }
+            );
+
+            const failedJobs = allJobs
+              .filter(j => j.conclusion === 'failure')
+              .map(j => j.name);
+
+            core.info(`Failed jobs (${failedJobs.length}): ${failedJobs.join(', ') || 'none found'}`);
+
             await github.rest.actions.reRunWorkflowFailedJobs({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -146,4 +163,5 @@ jobs:
               .addHeading('🔄 Manual Retry Triggered')
               .addRaw(`Workflow **${run.name}** (run [#${runId}](${run.html_url})) failed.`)
               .addRaw('Re-running only the failed jobs:')
+              .addList(failedJobs.length ? failedJobs : ['(could not determine individual jobs — re-running all failed jobs)'])
               .write();
