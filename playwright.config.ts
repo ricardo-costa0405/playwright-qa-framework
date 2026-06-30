@@ -45,7 +45,7 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
-    storageState: '.auth/standard_user.json',
+    storageState: '.auth/standard_user-chromium.json',  // overridden per project below
     trace: CI ? 'retain-on-failure-and-retries' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     actionTimeout: 0,
@@ -60,19 +60,19 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], storageState: '.auth/standard_user-chromium.json' },
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: { ...devices['Desktop Firefox'], storageState: '.auth/standard_user-firefox.json' },
     },
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      use: { ...devices['Desktop Safari'], storageState: '.auth/standard_user-webkit.json' },
     },
     {
       name: 'chromium-1366',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 768 } },
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 768 }, storageState: '.auth/standard_user-chromium.json' },
     },
   ],
 });
