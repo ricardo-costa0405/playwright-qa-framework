@@ -44,11 +44,41 @@ async function loginAsProblemUser(page: Page): Promise<{
   );
   await expect(page).toHaveURL(/inventory\.html/);
   await expect(page.locator(inventoryList)).toBeVisible();
+  // 🛡 False-positive guard: verify the session cookie confirms problem_user.
+  // Without this, a test that accidentally logs in as standard_user (or
+  // reuses a stale storageState) would still reach /inventory.html and
+  // appear to pass — but problem_user-specific glitches wouldn't be tested.
+  await assertSessionUser(page, 'problem_user');
 
   return {
     loginPage,
     inventoryPage: new SauceDemoInventoryPage(page),
   };
+}
+
+/**
+ * Asserts that the SauceDemo session cookie matches the expected username.
+ * This is the single reliable mechanism for verifying which user variant
+ * is actually logged in — page content alone is not sufficient because
+ * /inventory.html loads the same DOM skeleton for every user.
+ */
+async function assertSessionUser(page: Page, expectedUser: string): Promise<void> {
+  const cookies = await page.context().cookies();
+  const sessionCookie = cookies.find((c) => c.name === 'session-username');
+  expect(
+    sessionCookie,
+    `❌ session-username cookie not found — cannot verify logged-in user.\n` +
+      `    Expected: ${expectedUser}\n` +
+      `    This usually means the login step did not complete successfully.`
+  ).toBeDefined();
+  expect(
+    sessionCookie!.value,
+    `❌ Wrong user logged in.\n` +
+      `    Expected: ${expectedUser}\n` +
+      `    Actual:   ${sessionCookie!.value}\n` +
+      `    The test would produce false-positive results because SauceDemo ` +
+      `behavior differs per user variant.`
+  ).toBe(expectedUser);
 }
 
 test.describe('Problem User Variant @problem-user', () => {
