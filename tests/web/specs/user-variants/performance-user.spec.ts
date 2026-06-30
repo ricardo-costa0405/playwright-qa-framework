@@ -60,6 +60,10 @@ test.describe('Performance Glitch User Variant @performance-user', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.context().clearCookies();
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
   });
 
   // ─── Login performance ────────────────────────────────────────────────────
