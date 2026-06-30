@@ -55,11 +55,6 @@ test.describe('Problem User Variant @problem-user', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.context().clearCookies();
-    // Context-level storage clearing — avoids SecurityError from page.evaluate
-    await page.context().addInitScript(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
   });
 
   // ─── Login and inventory glitches ───────────────────────────────────────

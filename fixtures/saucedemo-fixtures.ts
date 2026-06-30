@@ -51,10 +51,7 @@ async function validateSession(page: import('@playwright/test').Page): Promise<v
 async function clearAllStorage(page: import('@playwright/test').Page): Promise<void> {
   await page.context().clearCookies();
   // Context-level storage clearing — avoids SecurityError from page.evaluate
-  await page.context().addInitScript(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-  });
+  // Storage clearing handled by per-test login — no addInitScript needed
 }
 
 // ─── Fixture types ───────────────────────────────────────────────────────────
